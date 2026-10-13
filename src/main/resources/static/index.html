@@ -1,0 +1,1252 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CityPulse | Intelligent Urban Traffic Intelligence</title>
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          crossorigin="">
+</head>
+
+<body>
+
+<div id="app">
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">CP</div>
+            <div>
+                <h1>CityPulse</h1>
+                <span>Urban Traffic Intelligence</span>
+            </div>
+        </div>
+
+        <nav class="navigation">
+
+            <a href="#" class="nav-item active" data-section="dashboard">
+                <span class="nav-icon">⌂</span>
+                <span>Dashboard</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="traffic">
+                <span class="nav-icon">🚦</span>
+                <span>Live Traffic</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="prediction">
+                <span class="nav-icon">◈</span>
+                <span>Prediction</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="routes">
+                <span class="nav-icon">⇄</span>
+                <span>Smart Routes</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="emergency">
+                <span class="nav-icon">⚠</span>
+                <span>Emergency Mode</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="alerts">
+                <span class="nav-icon">🔔</span>
+                <span>Smart Alerts</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="analytics">
+                <span class="nav-icon">▥</span>
+                <span>Analytics</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="reports">
+                <span class="nav-icon">📝</span>
+                <span>Citizen Reports</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="assistant">
+                <span class="nav-icon">✦</span>
+                <span>CityPulse AI</span>
+            </a>
+
+            <a href="#" class="nav-item" data-section="global">
+                <span class="nav-icon">🌍</span>
+                <span>Global World Map</span>
+            </a>
+
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="system-status">
+                <span class="status-dot"></span>
+                <span>System Online</span>
+            </div>
+        </div>
+
+    </aside>
+
+
+    <main class="main-content">
+
+        <header class="top-header">
+
+            <div class="header-left">
+                <h2 id="page-title">Traffic Intelligence Dashboard</h2>
+                <p id="page-subtitle">Real-time urban mobility overview</p>
+            </div>
+
+            <div class="header-right">
+
+                <div class="connection-status">
+                    <span class="status-dot"></span>
+                    <span>API Connected</span>
+                </div>
+
+                <div class="user-profile">
+                    <div class="user-avatar" id="user-avatar">U</div>
+                    <div class="user-info">
+                        <strong id="user-name">CityPulse User</strong>
+                        <span id="user-role">USER</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- DASHBOARD SECTION -->
+
+        <section id="dashboard-section" class="page-section active-section">
+
+            <div class="welcome-section">
+                <div>
+                    <span class="section-label">CITYPULSE INTELLIGENCE</span>
+                    <h3>Monitor your city's traffic in real time.</h3>
+                    <p>
+                        Analyze traffic conditions, congestion,
+                        predictions and urban mobility patterns
+                        from one intelligent platform.
+                    </p>
+                </div>
+                <div class="live-indicator">
+                    <span class="status-dot"></span>
+                    <span>Live Monitoring</span>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Active Roads</span>
+                        <span class="stat-icon">▣</span>
+                    </div>
+                    <strong id="active-roads">--</strong>
+                    <span class="stat-description">Roads currently monitored</span>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Traffic Records</span>
+                        <span class="stat-icon">🚦</span>
+                    </div>
+                    <strong id="traffic-records">--</strong>
+                    <span class="stat-description">Latest traffic observations</span>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Severe Traffic</span>
+                        <span class="stat-icon">⚠</span>
+                    </div>
+                    <strong id="severe-traffic">--</strong>
+                    <span class="stat-description">Roads with severe congestion</span>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Locations</span>
+                        <span class="stat-icon">⌖</span>
+                    </div>
+                    <strong id="locations-count">--</strong>
+                    <span class="stat-description">Monitored locations</span>
+                </div>
+
+            </div>
+
+            <div class="dashboard-grid">
+
+                <div class="panel map-panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="section-label">LIVE MAP</span>
+                            <h3>Interactive Traffic Map</h3>
+                        </div>
+                        <button class="panel-action"
+                                data-section-target="traffic">
+                            Open Map
+                        </button>
+                    </div>
+                    <div id="dashboard-map-placeholder" class="map-placeholder">
+                        <div class="map-placeholder-content">
+                            <div class="map-placeholder-icon">🗺</div>
+                            <h4>Traffic Map</h4>
+                            <p>Interactive traffic visualization will appear here.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="section-label">CURRENT STATUS</span>
+                            <h3>Traffic Overview</h3>
+                        </div>
+                    </div>
+                    <div id="traffic-overview" class="traffic-overview">
+                        <div class="empty-state">Loading traffic data...</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="panel modules-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">PLATFORM MODULES</span>
+                        <h3>CityPulse Intelligence Modules</h3>
+                    </div>
+                </div>
+
+                <div class="modules-grid">
+
+                    <div class="module-card">
+                        <div class="module-icon">🚦</div>
+                        <h4>Live Traffic</h4>
+                        <p>Monitor current road traffic conditions.</p>
+                    </div>
+
+                    <div class="module-card">
+                        <div class="module-icon">◈</div>
+                        <h4>Congestion Prediction</h4>
+                        <p>Analyze future traffic conditions using prediction models.</p>
+                    </div>
+
+                    <div class="module-card">
+                        <div class="module-icon">⇄</div>
+                        <h4>Smart Routes</h4>
+                        <p>Compare routes using traffic intelligence.</p>
+                    </div>
+
+                    <div class="module-card">
+                        <div class="module-icon">⚠</div>
+                        <h4>Smart Alerts</h4>
+                        <p>Identify important traffic conditions and anomalies.</p>
+                    </div>
+
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- LIVE TRAFFIC -->
+
+        <section id="traffic-section" class="page-section">
+
+            <div class="section-page-header">
+                <div>
+                    <span class="section-label">REAL-TIME MONITORING</span>
+                    <h3>Live Traffic</h3>
+                    <p>Monitor current traffic conditions across CityPulse locations.</p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">TRAFFIC MAP</span>
+                        <h3>Interactive Traffic Map</h3>
+                    </div>
+                    <div class="map-legend">
+                        <span><i class="legend-dot low"></i>Low</span>
+                        <span><i class="legend-dot moderate"></i>Moderate</span>
+                        <span><i class="legend-dot high"></i>High</span>
+                        <span><i class="legend-dot severe"></i>Severe</span>
+                    </div>
+                </div>
+                <div id="traffic-map" class="traffic-map">
+                    <div class="map-loading">Preparing traffic map...</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">LIVE DATA</span>
+                        <h3>Current Road Conditions</h3>
+                    </div>
+                </div>
+                <div id="live-traffic-table" class="data-container">
+                    <div class="empty-state">Loading live traffic data...</div>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- PREDICTION -->
+
+        <section id="prediction-section" class="page-section">
+
+            <span class="section-label">PREDICTIVE INTELLIGENCE</span>
+
+            <div class="section-heading-row">
+                <div>
+                    <h3>Traffic Prediction</h3>
+                    <p>
+                        Future congestion intelligence based on historical traffic trends and current weather conditions.
+                    </p>
+                </div>
+                <div>
+                    <button id="generate-predictions-button" class="primary-button" type="button">
+                        Generate Predictions
+                    </button>
+                    <button id="refresh-predictions-button" class="secondary-button" type="button">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="analytics-panel">
+                <div class="analytics-panel-header">
+                    <div>
+                        <span class="analytics-panel-label">PREDICTION INPUT</span>
+                        <h4>Select Monitored Road</h4>
+                    </div>
+                </div>
+                <div class="prediction-controls">
+                    <div>
+                        <label for="prediction-road-select" class="stat-label">ROAD</label>
+                        <select id="prediction-road-select" class="form-control">
+                            <option value="">Select a road</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="prediction-analysis-message" class="analysis-message" style="display: none;"></div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">CURRENT TRAFFIC</span>
+                    <strong id="prediction-current-level" class="stat-value">—</strong>
+                    <span class="stat-meta">Latest recorded traffic level</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">WEATHER IMPACT</span>
+                    <strong id="prediction-weather-score" class="stat-value">—</strong>
+                    <span class="stat-meta">Current weather impact score</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">WEATHER LEVEL</span>
+                    <strong id="prediction-weather-level" class="stat-value">—</strong>
+                    <span class="stat-meta">Weather effect on traffic</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">MODEL</span>
+                    <strong id="prediction-model" class="stat-value">—</strong>
+                    <span class="stat-meta">Prediction model version</span>
+                </div>
+            </div>
+
+            <div class="analytics-panel">
+                <div class="analytics-panel-header">
+                    <div>
+                        <span class="analytics-panel-label">FUTURE TRAFFIC</span>
+                        <h4>Congestion Forecast</h4>
+                    </div>
+                </div>
+                <div id="prediction-results" class="prediction-results"></div>
+                <div id="prediction-empty-state" class="empty-state" style="display: none;">
+                    <h4>No Predictions Available</h4>
+                    <p>Select a road and generate traffic predictions to view future congestion intelligence.</p>
+                </div>
+            </div>
+
+            <div class="analytics-panel">
+                <div class="analytics-panel-header">
+                    <div>
+                        <span class="analytics-panel-label">WEATHER CONTEXT</span>
+                        <h4>Current Weather Influence</h4>
+                    </div>
+                </div>
+                <div id="prediction-weather-context" class="route-recommendation-reason">
+                    <strong>Weather Information</strong>
+                    <p id="prediction-weather-summary">Select a road to view the latest weather context.</p>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- SMART ROUTES -->
+
+        <section id="routes-section" class="page-section">
+
+            <div class="section-page-header">
+                <div>
+                    <span class="section-label">SMART MOBILITY</span>
+                    <h3>Smart Route Recommendation</h3>
+                    <p>
+                        Compare available routes using current traffic, predicted congestion, distance and estimated travel time.
+                    </p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">ROUTE ANALYSIS</span>
+                        <h3>Select Journey</h3>
+                    </div>
+                </div>
+
+                <div class="route-form">
+                    <div class="route-field">
+                        <label for="route-start">FROM LOCATION</label>
+                        <select id="route-start">
+                            <option value="">Select starting location</option>
+                        </select>
+                    </div>
+
+                    <div class="route-field">
+                        <label for="route-destination">TO LOCATION</label>
+                        <select id="route-destination">
+                            <option value="">Select destination</option>
+                        </select>
+                    </div>
+
+                    <div class="route-action">
+                        <button id="analyze-routes-button" class="panel-action" type="button">
+                            Analyze Routes
+                        </button>
+                    </div>
+                </div>
+
+                <div id="route-analysis-message" class="empty-state" style="display: none;"></div>
+            </div>
+
+            <div id="route-results-panel" class="panel" style="display: none;">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">ROUTE OPTIONS</span>
+                        <h3>Traffic-Aware Route Analysis</h3>
+                    </div>
+                    <div id="route-result-count" class="section-label"></div>
+                </div>
+                <div id="route-results" class="route-results"></div>
+            </div>
+
+            <div id="recommended-route-panel" class="panel" style="display: none;">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">CITYPULSE RECOMMENDATION</span>
+                        <h3>Recommended Route</h3>
+                    </div>
+                </div>
+                <div id="recommended-route" class="recommended-route"></div>
+            </div>
+
+        </section>
+
+
+        <!-- EMERGENCY -->
+
+        <section id="emergency-section" class="page-section">
+
+            <div class="section-page-header">
+                <div>
+                    <span class="section-label">EMERGENCY RESPONSE</span>
+                    <h3>Emergency Route Simulation</h3>
+                    <p>
+                        Simulate an emergency route using current traffic information with priority and signal-priority analysis.
+                    </p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">EMERGENCY ANALYSIS</span>
+                        <h3>Configure Simulation</h3>
+                    </div>
+                </div>
+
+                <div class="route-form">
+
+                    <div class="route-field">
+                        <label for="emergency-type">EMERGENCY TYPE</label>
+                        <select id="emergency-type">
+                            <option value="">Select emergency type</option>
+                            <option value="AMBULANCE">Ambulance</option>
+                            <option value="FIRE_SERVICE">Fire Service</option>
+                        </select>
+                    </div>
+
+                    <div class="route-field">
+                        <label for="emergency-start">FROM LOCATION</label>
+                        <select id="emergency-start">
+                            <option value="">Select starting location</option>
+                        </select>
+                    </div>
+
+                    <div class="route-field">
+                        <label for="emergency-destination">TO LOCATION</label>
+                        <select id="emergency-destination">
+                            <option value="">Select destination</option>
+                        </select>
+                    </div>
+
+                    <div class="route-action">
+                        <button id="simulate-emergency-button" class="panel-action" type="button">
+                            Simulate Emergency Route
+                        </button>
+                    </div>
+
+                </div>
+
+                <div id="emergency-analysis-message" class="empty-state" style="display: none;"></div>
+            </div>
+
+            <div id="emergency-results-panel" class="panel" style="display: none;">
+
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">SIMULATION RESULT</span>
+                        <h3>Emergency Route Analysis</h3>
+                    </div>
+                    <span id="emergency-simulation-status" class="route-recommended-badge">
+                        COMPLETED
+                    </span>
+                </div>
+
+                <div class="route-recommendation-grid">
+                    <div class="route-metric">
+                        <span>Route Distance</span>
+                        <strong id="emergency-distance">--</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>Normal Travel Time</span>
+                        <strong id="emergency-normal-time">--</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>Emergency Travel Time</span>
+                        <strong id="emergency-time">--</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>Traffic Level</span>
+                        <strong id="emergency-traffic-level" class="traffic-level">--</strong>
+                    </div>
+                </div>
+
+                <div class="route-recommendation-details">
+                    <div>
+                        <span>Congestion Score</span>
+                        <strong id="emergency-congestion">--</strong>
+                    </div>
+                    <div>
+                        <span>Priority Status</span>
+                        <strong id="emergency-priority">--</strong>
+                    </div>
+                    <div>
+                        <span>Signal Priority</span>
+                        <strong id="emergency-signal">--</strong>
+                    </div>
+                </div>
+
+                <div class="route-recommendation-reason">
+                    <strong>Simulation Information</strong>
+                    <p id="emergency-result-message">--</p>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ALERTS -->
+
+        <section id="alerts-section" class="page-section">
+
+            <span class="section-label">INTELLIGENT ALERTS</span>
+
+            <div class="section-heading-row">
+                <div>
+                    <h3>Smart Alerts</h3>
+                    <p>
+                        Real-time congestion and traffic anomaly alerts generated from CityPulse traffic intelligence.
+                    </p>
+                </div>
+                <button id="refresh-alerts-button" class="primary-button" type="button">
+                    Refresh Alerts
+                </button>
+            </div>
+
+            <div class="stats-grid alerts-summary-grid">
+                <div class="stat-card">
+                    <span class="stat-label">TOTAL ALERTS</span>
+                    <strong id="alerts-total" class="stat-value">--</strong>
+                    <span class="stat-subtext">Available alerts</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">CRITICAL</span>
+                    <strong id="alerts-critical" class="stat-value">--</strong>
+                    <span class="stat-subtext">Immediate attention</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">HIGH</span>
+                    <strong id="alerts-high" class="stat-value">--</strong>
+                    <span class="stat-subtext">High-priority alerts</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">ACTIVE</span>
+                    <strong id="alerts-active" class="stat-value">--</strong>
+                    <span class="stat-subtext">Currently active</span>
+                </div>
+            </div>
+
+            <div id="alerts-analysis-message" class="analysis-message" style="display: none;"></div>
+
+            <div id="alerts-list" class="alerts-list"></div>
+
+            <div id="alerts-empty-state" class="empty-state" style="display: none;">
+                <h4>No Smart Alerts</h4>
+                <p>CityPulse currently has no alerts to display.</p>
+            </div>
+
+        </section>
+
+
+        <!-- ANALYTICS -->
+
+        <section id="analytics-section" class="page-section">
+
+            <span class="section-label">HISTORICAL INTELLIGENCE</span>
+
+            <div class="section-heading-row">
+                <div>
+                    <h3>Traffic Analytics</h3>
+                    <p>
+                        Historical traffic intelligence calculated from stored CityPulse traffic records.
+                    </p>
+                </div>
+                <button id="refresh-analytics-button" class="primary-button" type="button">
+                    Refresh Analytics
+                </button>
+            </div>
+
+            <div id="analytics-analysis-message" class="analysis-message" style="display: none;"></div>
+
+            <div class="stats-grid analytics-summary-grid">
+                <div class="stat-card">
+                    <span class="stat-label">TOTAL RECORDS</span>
+                    <strong id="analytics-total-records" class="stat-value">—</strong>
+                    <span class="stat-meta">Historical traffic records</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">AVG VEHICLES</span>
+                    <strong id="analytics-average-vehicles" class="stat-value">—</strong>
+                    <span class="stat-meta">Vehicles per record</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">AVG SPEED</span>
+                    <strong id="analytics-average-speed" class="stat-value">—</strong>
+                    <span class="stat-meta">Kilometres per hour</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">AVG DENSITY</span>
+                    <strong id="analytics-average-density" class="stat-value">—</strong>
+                    <span class="stat-meta">Traffic density</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">AVG CONGESTION</span>
+                    <strong id="analytics-average-congestion" class="stat-value">—</strong>
+                    <span class="stat-meta">Congestion score</span>
+                </div>
+            </div>
+
+            <div class="analytics-grid">
+
+                <div class="analytics-panel">
+                    <div class="analytics-panel-header">
+                        <div>
+                            <span class="analytics-panel-label">TRAFFIC DISTRIBUTION</span>
+                            <h4>Traffic Level History</h4>
+                        </div>
+                    </div>
+                    <div id="analytics-traffic-distribution" class="analytics-distribution"></div>
+                </div>
+
+                <div class="analytics-panel">
+                    <div class="analytics-panel-header">
+                        <div>
+                            <span class="analytics-panel-label">SPEED ANALYSIS</span>
+                            <h4>Recorded Speed Range</h4>
+                        </div>
+                    </div>
+                    <div class="analytics-metric-row">
+                        <div class="analytics-metric">
+                            <span>Minimum Speed</span>
+                            <strong id="analytics-min-speed">—</strong>
+                        </div>
+                        <div class="analytics-metric">
+                            <span>Maximum Speed</span>
+                            <strong id="analytics-max-speed">—</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analytics-panel">
+                    <div class="analytics-panel-header">
+                        <div>
+                            <span class="analytics-panel-label">DENSITY ANALYSIS</span>
+                            <h4>Recorded Density Range</h4>
+                        </div>
+                    </div>
+                    <div class="analytics-metric-row">
+                        <div class="analytics-metric">
+                            <span>Minimum Density</span>
+                            <strong id="analytics-min-density">—</strong>
+                        </div>
+                        <div class="analytics-metric">
+                            <span>Maximum Density</span>
+                            <strong id="analytics-max-density">—</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analytics-panel">
+                    <div class="analytics-panel-header">
+                        <div>
+                            <span class="analytics-panel-label">ANALYSIS PERIOD</span>
+                            <h4>Historical Coverage</h4>
+                        </div>
+                    </div>
+                    <div class="analytics-period">
+                        <div>
+                            <span>Analysis Start</span>
+                            <strong id="analytics-analysis-start">—</strong>
+                        </div>
+                        <div>
+                            <span>Analysis End</span>
+                            <strong id="analytics-analysis-end">—</strong>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="analytics-empty-state" class="empty-state" style="display: none;">
+                <h4>No Historical Traffic Data</h4>
+                <p>
+                    CityPulse currently has no historical traffic records available for analysis.
+                </p>
+            </div>
+
+        </section>
+
+
+        <!-- CITIZEN REPORTS -->
+
+        <section id="reports-section" class="page-section">
+
+            <span class="section-label">CITIZEN PARTICIPATION</span>
+
+            <div class="section-heading-row">
+                <div>
+                    <h3>Citizen Traffic Reports</h3>
+                    <p>
+                        Report accidents, road problems and unusual traffic conditions observed across the city.
+                    </p>
+                </div>
+                <button id="refresh-reports-button" class="secondary-button" type="button">
+                    ↻ Refresh
+                </button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">SUBMIT REPORT</span>
+                        <h3>Report a Traffic Issue</h3>
+                    </div>
+                </div>
+
+                <form id="citizen-report-form">
+
+                    <div class="route-form">
+                        <div class="route-field">
+                            <label for="report-type">REPORT TYPE</label>
+                            <select id="report-type" required>
+                                <option value="">Select report type</option>
+                                <option value="ACCIDENT">Accident</option>
+                                <option value="BLOCKAGE">Road Blockage</option>
+                                <option value="SIGNAL_PROBLEM">Signal Problem</option>
+                                <option value="ROAD_CLOSED">Road Closed</option>
+                                <option value="UNUSUAL_CONGESTION">Unusual Congestion</option>
+                            </select>
+                        </div>
+
+                        <div class="route-field">
+                            <label for="report-road">ROAD</label>
+                            <select id="report-road">
+                                <option value="">Select road</option>
+                            </select>
+                        </div>
+
+                        <div class="route-field">
+                            <label for="report-location">LOCATION</label>
+                            <select id="report-location">
+                                <option value="">Select location</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="route-field report-description-field">
+                        <label for="report-description">DESCRIPTION</label>
+                        <textarea id="report-description" rows="5" maxlength="1000"
+                                  placeholder="Describe the traffic issue..." required></textarea>
+                    </div>
+
+                    <div id="report-form-message" class="analysis-message" style="display: none;"></div>
+
+                    <div class="route-action">
+                        <button type="submit" class="primary-button" id="submit-report-button">
+                            Submit Report
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">COMMUNITY REPORTS</span>
+                        <h3>Recent Traffic Reports</h3>
+                    </div>
+                    <div id="reports-count" class="section-label">0 REPORTS</div>
+                </div>
+
+                <div id="citizen-reports-list" class="data-container">
+                    <div class="empty-state">
+                        <h4>No Citizen Reports</h4>
+                        <p>No community traffic reports are currently available.</p>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- CITYPULSE AI -->
+
+        <section id="assistant-section" class="page-section">
+
+            <span class="section-label">CITYPULSE AI</span>
+
+            <div class="section-heading-row">
+                <div>
+                    <h3>CityPulse AI Assistant</h3>
+                    <p>
+                        Ask questions about current traffic, predictions, alerts, weather, roads and citizen reports using CityPulse intelligence.
+                    </p>
+                </div>
+            </div>
+
+            <div id="ai-analysis-message" class="analysis-message" style="display: none;"></div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">INTELLIGENT ASSISTANT</span>
+                        <h3>Ask CityPulse</h3>
+                    </div>
+                    <span class="route-recommended-badge">CITY DATA</span>
+                </div>
+
+                <div id="ai-chat-container" class="data-container"
+                     style="min-height: 260px; max-height: 500px; overflow-y: auto;">
+                    <div class="empty-state" id="ai-welcome-message">
+                        <h4>Welcome to CityPulse AI</h4>
+                        <p>
+                            Ask about traffic conditions, congestion predictions, weather impact, alerts or citizen reports.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="ai-question-form" style="margin-top: 20px;">
+                    <div class="route-field">
+                        <label for="ai-question">YOUR QUESTION</label>
+                        <textarea id="ai-question" rows="3" maxlength="500"
+                                  placeholder="Example: What is the current traffic situation?" required></textarea>
+                    </div>
+                    <div class="route-action" style="margin-top: 15px;">
+                        <button type="submit" id="ask-ai-button" class="primary-button">
+                            Ask CityPulse AI
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">QUICK QUESTIONS</span>
+                        <h3>Ask About CityPulse</h3>
+                    </div>
+                </div>
+
+                <div class="modules-grid">
+
+                    <button type="button" class="module-card ai-question-button"
+                            data-question="What is the current traffic situation?">
+                        <div class="module-icon">🚦</div>
+                        <h4>Current Traffic</h4>
+                        <p>View the latest traffic conditions.</p>
+                    </button>
+
+                    <button type="button" class="module-card ai-question-button"
+                            data-question="What are the latest traffic predictions?">
+                        <div class="module-icon">◈</div>
+                        <h4>Predictions</h4>
+                        <p>View upcoming congestion predictions.</p>
+                    </button>
+
+                    <button type="button" class="module-card ai-question-button"
+                            data-question="Are there any active traffic alerts?">
+                        <div class="module-icon">🔔</div>
+                        <h4>Traffic Alerts</h4>
+                        <p>Check active CityPulse alerts.</p>
+                    </button>
+
+                    <button type="button" class="module-card ai-question-button"
+                            data-question="What is the current weather impact on traffic?">
+                        <div class="module-icon">☁</div>
+                        <h4>Weather Impact</h4>
+                        <p>Check current weather information.</p>
+                    </button>
+
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- GLOBAL WORLD MAP -->
+
+        <section id="global-section" class="page-section">
+
+            <div class="section-page-header">
+                <div>
+                    <span class="section-label">GLOBAL INTELLIGENCE</span>
+                    <h3>Global World Map</h3>
+                    <p>
+                        Explore CityPulse global coverage across countries and regions. Select a country to view its geographic layer and country profile.
+                    </p>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">COUNTRIES LOADED</span>
+                    <strong id="global-countries-count" class="stat-value">—</strong>
+                    <span class="stat-meta">Country layers available</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">SELECTED COUNTRY</span>
+                    <strong id="global-selected-country" class="stat-value">—</strong>
+                    <span class="stat-meta">Currently focused country</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">COUNTRY CODE</span>
+                    <strong id="global-selected-code" class="stat-value">—</strong>
+                    <span class="stat-meta">ISO country code</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">COVERAGE STATUS</span>
+                    <strong id="global-coverage-status" class="stat-value">—</strong>
+                    <span class="stat-meta">Geographic layer status</span>
+                </div>
+            </div>
+
+            <div class="analytics-panel">
+                <div class="analytics-panel-header">
+                    <div>
+                        <span class="analytics-panel-label">COUNTRY SELECTION</span>
+                        <h4>Search, Filter and Select a Country</h4>
+                    </div>
+                </div>
+
+                <div class="prediction-controls">
+                    <div>
+                        <label for="global-country-search" class="stat-label">SEARCH COUNTRY</label>
+                        <input type="text" id="global-country-search" class="form-control"
+                               placeholder="Type to search (e.g., India, United, Japan)"
+                               autocomplete="off" maxlength="60">
+                    </div>
+
+                    <div>
+                        <label for="global-region-filter" class="stat-label">REGION</label>
+                        <select id="global-region-filter" class="form-control">
+                            <option value="">All Regions</option>
+                            <option value="Asia">Asia</option>
+                            <option value="Europe">Europe</option>
+                            <option value="Americas">Americas</option>
+                            <option value="Africa">Africa</option>
+                            <option value="Oceania">Oceania</option>
+                            <option value="Middle East">Middle East</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="global-country-select" class="stat-label">COUNTRY</label>
+                        <select id="global-country-select" class="form-control">
+                            <option value="">Select a country</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="global-country-search-status" class="stat-label" style="margin-top: 8px;"></div>
+            </div>
+
+            <div id="global-analysis-message" class="analysis-message" style="display: none;"></div>
+
+
+            <!-- COUNTRY INTELLIGENCE PANEL -->
+
+            <div id="global-country-profile-panel" class="panel" style="display: none;">
+
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">COUNTRY INTELLIGENCE</span>
+                        <h3 id="global-profile-title">Country Profile</h3>
+                    </div>
+                    <span class="route-recommended-badge" id="global-profile-region-badge">—</span>
+                </div>
+
+                <div class="route-recommendation-grid">
+                    <div class="route-metric">
+                        <span>Country Name</span>
+                        <strong id="global-profile-name">—</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>ISO Code</span>
+                        <strong id="global-profile-code">—</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>Capital City</span>
+                        <strong id="global-profile-capital">—</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>Region</span>
+                        <strong id="global-profile-region">—</strong>
+                    </div>
+                </div>
+
+                <div class="route-recommendation-details">
+                    <div>
+                        <span>Population</span>
+                        <strong id="global-profile-population">—</strong>
+                    </div>
+                    <div>
+                        <span>Currency</span>
+                        <strong id="global-profile-currency">—</strong>
+                    </div>
+                    <div>
+                        <span>Time Zone</span>
+                        <strong id="global-profile-timezone">—</strong>
+                    </div>
+                </div>
+
+                <div class="route-recommendation-reason">
+                    <strong>Coordinates</strong>
+                    <p id="global-profile-coordinates">—</p>
+                </div>
+
+                <div class="route-recommendation-reason" style="margin-top: 16px;">
+                    <strong>
+                        Local Time in
+                        <span id="global-clock-country">—</span>
+                    </strong>
+
+                    <div class="route-recommendation-details" style="margin-top: 12px;">
+                        <div>
+                            <span>Local Time</span>
+                            <strong id="global-clock-time">—</strong>
+                        </div>
+                        <div>
+                            <span>Day</span>
+                            <strong id="global-clock-day">—</strong>
+                        </div>
+                        <div>
+                            <span>Date</span>
+                            <strong id="global-clock-date">—</strong>
+                        </div>
+                    </div>
+
+                    <p id="global-clock-zone" style="margin-top: 10px;">—</p>
+
+                    <p id="global-clock-status"
+                       style="margin-top: 6px; font-size: 12px; opacity: 0.7;"></p>
+
+                </div>
+
+            </div>
+
+
+            <!-- COUNTRY TRAFFIC INTELLIGENCE PANEL -->
+
+            <div id="global-country-traffic-panel" class="panel" style="display: none;">
+
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">COUNTRY TRAFFIC INTELLIGENCE</span>
+                        <h3 id="global-traffic-title">Traffic Summary</h3>
+                    </div>
+                    <span class="route-recommended-badge" id="global-traffic-risk-badge">—</span>
+                </div>
+
+                <div class="route-recommendation-grid">
+                    <div class="route-metric">
+                        <span>Cities Tracked</span>
+                        <strong id="global-traffic-cities">—</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>Congestion Risk</span>
+                        <strong id="global-traffic-risk">—</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>Risk Level</span>
+                        <strong id="global-traffic-risk-level">—</strong>
+                    </div>
+                    <div class="route-metric">
+                        <span>Region</span>
+                        <strong id="global-traffic-region">—</strong>
+                    </div>
+                </div>
+
+                <div class="route-recommendation-details">
+                    <div>
+                        <span>Peak Hours</span>
+                        <strong id="global-traffic-peak-hours">—</strong>
+                    </div>
+                    <div>
+                        <span>Data Source</span>
+                        <strong id="global-traffic-source">—</strong>
+                    </div>
+                    <div>
+                        <span>Data Status</span>
+                        <strong id="global-traffic-status">—</strong>
+                    </div>
+                </div>
+
+                <div class="route-recommendation-reason">
+                    <strong>Peak Direction</strong>
+                    <p id="global-traffic-peak-direction">—</p>
+                </div>
+
+                <div class="route-recommendation-reason">
+                    <strong>Real Traffic API Integration</strong>
+                    <p id="global-traffic-api-status">—</p>
+                </div>
+
+            </div>
+
+
+            <!-- COUNTRY COMPARISON PANEL -->
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">COUNTRY COMPARISON</span>
+                        <h3>Compare Two Countries</h3>
+                    </div>
+                </div>
+
+                <div class="prediction-controls">
+                    <div>
+                        <label for="global-compare-a" class="stat-label">COUNTRY A</label>
+                        <select id="global-compare-a" class="form-control">
+                            <option value="">Select Country A</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="global-compare-b" class="stat-label">COUNTRY B</label>
+                        <select id="global-compare-b" class="form-control">
+                            <option value="">Select Country B</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="stat-label">&nbsp;</label>
+                        <button id="global-compare-button" class="primary-button"
+                                type="button" style="width: 100%;">
+                            Compare Countries
+                        </button>
+                    </div>
+                </div>
+
+                <div id="global-compare-status" class="analysis-message"
+                     style="display: none; margin-top: 16px;"></div>
+
+                <div id="global-compare-results" style="margin-top: 20px;"></div>
+            </div>
+
+
+            <!-- GLOBAL MAP -->
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="section-label">WORLD MAP</span>
+                        <h3>Interactive Global Map</h3>
+                    </div>
+                    <button id="global-reset-view-button" class="secondary-button"
+                            type="button">
+                        Reset View
+                    </button>
+                </div>
+
+                <div id="global-map" class="traffic-map">
+                    <div class="map-loading">Preparing global map...</div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin="">
+</script>
+
+<script src="/js/app.js"></script>
+
+</body>
+</html>
