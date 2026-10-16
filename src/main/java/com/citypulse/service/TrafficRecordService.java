@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,11 +22,14 @@ import java.util.Set;
 public class TrafficRecordService {
 
     private final TrafficRecordRepository trafficRecordRepository;
+    private final WebSocketBroadcastService webSocketBroadcastService;
 
     public TrafficRecordService(
-            TrafficRecordRepository trafficRecordRepository) {
+            TrafficRecordRepository trafficRecordRepository,
+            WebSocketBroadcastService webSocketBroadcastService) {
 
         this.trafficRecordRepository = trafficRecordRepository;
+        this.webSocketBroadcastService = webSocketBroadcastService;
     }
 
     public List<TrafficRecord> getAllTrafficRecords() {
@@ -647,67 +651,77 @@ public class TrafficRecordService {
     public TrafficRecord createTrafficRecord(
             TrafficRecord trafficRecord) {
 
-        return trafficRecordRepository.save(trafficRecord);
+        TrafficRecord savedRecord =
+                trafficRecordRepository.save(trafficRecord);
+
+        broadcastTrafficRecord(savedRecord, "CREATED");
+
+        return savedRecord;
     }
 
     public TrafficRecord updateTrafficRecord(
             Long id,
             TrafficRecord updatedTrafficRecord) {
 
-        return trafficRecordRepository.findById(id)
-                .map(existingRecord -> {
+        TrafficRecord savedRecord =
+                trafficRecordRepository.findById(id)
+                        .map(existingRecord -> {
 
-                    existingRecord.setRoad(
-                            updatedTrafficRecord.getRoad()
-                    );
+                            existingRecord.setRoad(
+                                    updatedTrafficRecord.getRoad()
+                            );
 
-                    existingRecord.setLocation(
-                            updatedTrafficRecord.getLocation()
-                    );
+                            existingRecord.setLocation(
+                                    updatedTrafficRecord.getLocation()
+                            );
 
-                    existingRecord.setVehicleCount(
-                            updatedTrafficRecord.getVehicleCount()
-                    );
+                            existingRecord.setVehicleCount(
+                                    updatedTrafficRecord.getVehicleCount()
+                            );
 
-                    existingRecord.setAverageSpeed(
-                            updatedTrafficRecord.getAverageSpeed()
-                    );
+                            existingRecord.setAverageSpeed(
+                                    updatedTrafficRecord.getAverageSpeed()
+                            );
 
-                    existingRecord.setTrafficDensity(
-                            updatedTrafficRecord.getTrafficDensity()
-                    );
+                            existingRecord.setTrafficDensity(
+                                    updatedTrafficRecord.getTrafficDensity()
+                            );
 
-                    existingRecord.setTrafficLevel(
-                            updatedTrafficRecord.getTrafficLevel()
-                    );
+                            existingRecord.setTrafficLevel(
+                                    updatedTrafficRecord.getTrafficLevel()
+                            );
 
-                    existingRecord.setCongestionScore(
-                            updatedTrafficRecord.getCongestionScore()
-                    );
+                            existingRecord.setCongestionScore(
+                                    updatedTrafficRecord.getCongestionScore()
+                            );
 
-                    /*
-                     * Keep the existing recordedAt timestamp
-                     * when the update request does not provide one.
-                     */
-                    if (updatedTrafficRecord.getRecordedAt() != null) {
+                            /*
+                             * Keep the existing recordedAt timestamp
+                             * when the update request does not provide one.
+                             */
+                            if (updatedTrafficRecord.getRecordedAt() != null) {
 
-                        existingRecord.setRecordedAt(
-                                updatedTrafficRecord.getRecordedAt()
-                        );
-                    }
+                                existingRecord.setRecordedAt(
+                                        updatedTrafficRecord.getRecordedAt()
+                                );
+                            }
 
-                    existingRecord.setDataSource(
-                            updatedTrafficRecord.getDataSource()
-                    );
+                            existingRecord.setDataSource(
+                                    updatedTrafficRecord.getDataSource()
+                            );
 
-                    return trafficRecordRepository.save(
-                            existingRecord
-                    );
-                })
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Traffic record not found with id: " + id
-                        ));
+                            return trafficRecordRepository.save(
+                                    existingRecord
+                            );
+                        })
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Traffic record not found with id: " + id
+                                ));
+
+        broadcastTrafficRecord(savedRecord, "UPDATED");
+
+        return savedRecord;
     }
 
     public void deleteTrafficRecord(Long id) {
@@ -720,5 +734,79 @@ public class TrafficRecordService {
         }
 
         trafficRecordRepository.deleteById(id);
+    }
+
+    // =========================================================
+    // WEBSOCKET BROADCAST HELPER
+    // =========================================================
+
+    /**
+     * Builds a safe, lazily-evaluated payload for the WebSocket
+     * broadcast and sends it to /topic/traffic.
+     *
+     * Only exposes scalar fields (no lazy JPA associations)
+     * to avoid LazyInitializationException during serialization.
+     */
+    private void broadcastTrafficRecord(
+            TrafficRecord record,
+            String action) {
+
+        if (record == null) {
+            return;
+        }
+
+        Map<String, Object> payload =
+                new LinkedHashMap<>();
+
+        payload.put("action", action);
+        payload.put("recordId", record.getId());
+
+        if (record.getRoad() != null) {
+            payload.put("roadId", record.getRoad().getId());
+        }
+
+        if (record.getLocation() != null) {
+            payload.put("locationId", record.getLocation().getId());
+        }
+
+        payload.put("vehicleCount", record.getVehicleCount());
+
+        payload.put(
+                "averageSpeed",
+                record.getAverageSpeed() != null
+                        ? record.getAverageSpeed().doubleValue()
+                        : null);
+
+        payload.put(
+                "trafficDensity",
+                record.getTrafficDensity() != null
+                        ? record.getTrafficDensity().doubleValue()
+                        : null);
+
+        payload.put("trafficLevel", record.getTrafficLevel());
+
+        payload.put(
+                "congestionScore",
+                record.getCongestionScore() != null
+                        ? record.getCongestionScore().doubleValue()
+                        : null);
+
+        payload.put(
+                "recordedAt",
+                record.getRecordedAt() != null
+                        ? record.getRecordedAt().toString()
+                        : null);
+
+        payload.put("dataSource", record.getDataSource());
+
+        try {
+
+            webSocketBroadcastService.broadcastTrafficUpdate(payload);
+
+        } catch (Exception exception) {
+
+            // WebSocket broadcast must never break the main
+            // traffic record operation.
+        }
     }
 }

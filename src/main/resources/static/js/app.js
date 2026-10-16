@@ -4924,3 +4924,244 @@ document.addEventListener(
 
     }
 );
+
+
+/* ============================================
+   CITYPULSE LIVE WEBSOCKET CLIENT
+   Real-time updates via STOMP over WebSocket
+============================================ */
+
+(function () {
+
+    // ============================================
+    // FIX: STOMP 7 exposes the client as StompJs.Stomp,
+    // not as a global Stomp. We alias it here so that
+    // the rest of the client uses the classic name.
+    // ============================================
+    var StompClient =
+        (typeof Stomp !== "undefined")
+            ? Stomp
+            : (typeof StompJs !== "undefined"
+                && StompJs !== null
+                && typeof StompJs.Stomp !== "undefined")
+                ? StompJs.Stomp
+                : null;
+
+    let stompClient = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 10;
+    const RECONNECT_DELAY_MS = 5000;
+
+    function setLiveIndicator(text, cssClass) {
+
+        const indicator = document.getElementById(
+            "traffic-live-indicator");
+
+        if (!indicator) return;
+
+        indicator.textContent = text;
+
+        indicator.classList.remove("live", "offline", "connecting");
+
+        if (cssClass) {
+            indicator.classList.add(cssClass);
+        }
+    }
+
+    function updateDashboardCounters(payload) {
+
+        if (!payload) return;
+
+        const recordsEl = document.getElementById("traffic-records");
+
+        if (recordsEl) {
+
+            const current = parseInt(recordsEl.textContent, 10);
+
+            if (!isNaN(current)) {
+                recordsEl.textContent = current + 1;
+            }
+        }
+    }
+
+    function handleTrafficUpdate(message) {
+
+        let envelope;
+
+        try {
+            envelope = JSON.parse(message.body);
+        } catch (e) {
+            return;
+        }
+
+        if (!envelope || envelope.event !== "TRAFFIC_UPDATED") {
+            return;
+        }
+
+        const payload = envelope.payload || {};
+
+        setLiveIndicator("● LIVE — update received", "live");
+
+        updateDashboardCounters(payload);
+
+        const activeSection = document.querySelector(
+            ".page-section.active-section");
+
+        if (!activeSection) return;
+
+        const sectionId = activeSection.id;
+
+        try {
+
+            if (sectionId === "traffic-section") {
+
+                if (typeof CityPulseApp.loadLiveTrafficPage === "function") {
+                    CityPulseApp.loadLiveTrafficPage();
+                }
+            }
+
+            if (sectionId === "dashboard-section") {
+
+                if (typeof CityPulseApp.loadDashboard === "function") {
+                    CityPulseApp.loadDashboard();
+                }
+            }
+
+        } catch (e) {
+            // Silent — never break UI on live update
+        }
+
+        setTimeout(() => {
+            setLiveIndicator("● LIVE", "live");
+        }, 2500);
+    }
+
+    function connect() {
+
+        if (typeof SockJS === "undefined"
+                || StompClient === null) {
+
+            setLiveIndicator("● OFFLINE (libraries missing)", "offline");
+            return;
+        }
+
+        setLiveIndicator("● CONNECTING...", "connecting");
+
+        let socket;
+
+        try {
+            socket = new SockJS("/ws-citypulse");
+        } catch (e) {
+            setLiveIndicator("● OFFLINE", "offline");
+            return;
+        }
+
+        stompClient = StompClient.over(socket);
+
+        stompClient.debug = null;
+
+        stompClient.connect(
+            {},
+            function onConnected() {
+
+                reconnectAttempts = 0;
+
+                setLiveIndicator("● LIVE", "live");
+
+                stompClient.subscribe(
+                    "/topic/traffic",
+                    handleTrafficUpdate
+                );
+
+                stompClient.subscribe(
+                    "/topic/predictions",
+                    function (message) {
+
+                        setLiveIndicator(
+                            "● LIVE — prediction received",
+                            "live"
+                        );
+
+                        setTimeout(() => {
+                            setLiveIndicator("● LIVE", "live");
+                        }, 2500);
+                    }
+                );
+
+                stompClient.subscribe(
+                    "/topic/alerts",
+                    function (message) {
+
+                        setLiveIndicator(
+                            "● LIVE — alert received",
+                            "live"
+                        );
+
+                        setTimeout(() => {
+                            setLiveIndicator("● LIVE", "live");
+                        }, 2500);
+                    }
+                );
+
+                stompClient.subscribe(
+                    "/topic/reports",
+                    function (message) {
+
+                        setLiveIndicator(
+                            "● LIVE — report received",
+                            "live"
+                        );
+
+                        setTimeout(() => {
+                            setLiveIndicator("● LIVE", "live");
+                        }, 2500);
+                    }
+                );
+            },
+            function onError() {
+
+                setLiveIndicator("● OFFLINE — retrying...", "offline");
+
+                attemptReconnect();
+            }
+        );
+    }
+
+    function attemptReconnect() {
+
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            setLiveIndicator("● OFFLINE (gave up)", "offline");
+            return;
+        }
+
+        reconnectAttempts++;
+
+        setTimeout(() => {
+
+            try {
+                connect();
+            } catch (e) {
+                attemptReconnect();
+            }
+
+        }, RECONNECT_DELAY_MS);
+    }
+
+    function initialize() {
+
+        if (document.readyState === "loading") {
+
+            document.addEventListener(
+                "DOMContentLoaded",
+                connect
+            );
+
+        } else {
+
+            connect();
+        }
+    }
+
+    initialize();
+
+})();
