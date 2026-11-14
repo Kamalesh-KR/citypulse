@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/alerts")
@@ -138,6 +139,38 @@ public class AlertController {
                 alertService.generateSmartAlerts(roadId);
 
         return ResponseEntity.ok(alerts);
+    }
+
+    /**
+     * NEW (Fix #2): Generates alerts for EVERY road that
+     * currently has HIGH or SEVERE traffic.
+     *
+     * This makes Test 7 pass — it populates alerts
+     * across all roads, not just MG Road.
+     *
+     * Example:
+     * POST /api/alerts/generate/all
+     *
+     * Response:
+     * {
+     *   "created": 42,
+     *   "alerts": [ ... ]
+     * }
+     */
+    @PostMapping("/generate/all")
+    public ResponseEntity<Map<String, Object>> generateAllSmartAlerts() {
+
+        List<Alert> created =
+                alertService.generateAllSmartAlerts();
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "created",
+                        created.size(),
+                        "alerts",
+                        created
+                )
+        );
     }
 
     // =========================================================

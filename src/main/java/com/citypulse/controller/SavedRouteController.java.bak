@@ -1,0 +1,299 @@
+package com.citypulse.controller;
+
+import com.citypulse.model.FavoriteRoad;
+import com.citypulse.model.SavedRoute;
+import com.citypulse.model.User;
+import com.citypulse.repository.FavoriteRoadRepository;
+import com.citypulse.repository.SavedRouteRepository;
+import com.citypulse.service.UserService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * ============================================================
+ * SAVED ROUTES + FAVORITE ROADS (C4)
+ * ============================================================
+ *
+ * Every endpoint here requires JWT authentication.
+ * The user's identity is read from SecurityContextHolder
+ * (set by JwtAuthFilter in the security chain).
+ */
+@RestController
+@RequestMapping("/api")
+public class SavedRouteController {
+
+    private final SavedRouteRepository savedRouteRepository;
+    private final FavoriteRoadRepository favoriteRoadRepository;
+    private final UserService userService;
+
+    public SavedRouteController(
+            SavedRouteRepository savedRouteRepository,
+            FavoriteRoadRepository favoriteRoadRepository,
+            UserService userService) {
+
+        this.savedRouteRepository = savedRouteRepository;
+        this.favoriteRoadRepository = favoriteRoadRepository;
+        this.userService = userService;
+    }
+
+
+    /* =========================================================
+       HELPER — Resolve current user from JWT
+       ========================================================= */
+
+    private User resolveCurrentUser(Authentication authentication) {
+
+        if (authentication == null || authentication.getName() == null) {
+            return null;
+        }
+
+        return userService
+                .getUserByEmail(authentication.getName())
+                .orElse(null);
+    }
+
+
+    /* =========================================================
+       SAVED ROUTES
+       ========================================================= */
+
+    @PostMapping("/saved-routes")
+    public ResponseEntity<?> saveRoute(
+            Authentication auth,
+            @RequestBody Map<String, Object> body) {
+
+        User user = resolveCurrentUser(auth);
+        if (user == null) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Authentication required"));
+        }
+
+        Long fromId = body.get("fromLocationId") != null
+                ? Long.valueOf(String.valueOf(body.get("fromLocationId")))
+                : null;
+        Long toId = body.get("toLocationId") != null
+                ? Long.valueOf(String.valueOf(body.get("toLocationId")))
+                : null;
+
+        if (fromId == null || toId == null) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "fromLocationId and toLocationId are required"));
+        }
+
+        if (savedRouteRepository.existsByUserIdAndFromLocationIdAndToLocationId(
+                user.getId(), fromId, toId)) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "Route already saved"));
+        }
+
+        SavedRoute route = new SavedRoute(
+                user.getId(),
+                str(body.get("routeName")),
+                fromId,
+                str(body.get("fromLocationName")),
+                toId,
+                str(body.get("toLocationName")),
+                num(body.get("distanceKm")),
+                num(body.get("estimatedMinutes")),
+                str(body.get("trafficLevelAtSave"))
+        );
+
+        SavedRoute saved = savedRouteRepository.save(route);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+
+    @GetMapping("/saved-routes")
+    public ResponseEntity<?> getMySavedRoutes(Authentication auth) {
+
+        User user = resolveCurrentUser(auth);
+        if (user == null) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Authentication required"));
+        }
+
+        List<SavedRoute> routes =
+                savedRouteRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+
+        return ResponseEntity.ok(routes);
+    }
+
+
+    @GetMapping("/saved-routes/{id}")
+    public ResponseEntity<?> getOneSavedRoute(
+            Authentication auth,
+            @PathVariable Long id) {
+
+        User user = resolveCurrentUser(auth);
+        if (user == null) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Authentication required"));
+        }
+
+        Optional<SavedRoute> result =
+                savedRouteRepository.findByIdAndUserId(id, user.getId());
+
+        return result
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity
+                        .status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Route not found")));
+    }
+
+
+    @DeleteMapping("/saved-routes/{id}")
+    public ResponseEntity<?> deleteSavedRoute(
+            Authentication auth,
+            @PathVariable Long id) {
+
+        User user = resolveCurrentUser(auth);
+        if (user == null) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Authentication required"));
+        }
+
+        Optional<SavedRoute> result =
+                savedRouteRepository.findByIdAndUserId(id, user.getId());
+
+        if (result.isEmpty()) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Route not found"));
+        }
+
+        savedRouteRepository.delete(result.get());
+        return ResponseEntity.ok(Map.of("deleted", true, "id", id));
+    }
+
+
+    /* =========================================================
+       FAVORITE ROADS
+       ========================================================= */
+
+    @PostMapping("/favorite-roads")
+    public ResponseEntity<?> favoriteRoad(
+            Authentication auth,
+            @RequestBody Map<String, Object> body) {
+
+        User user = resolveCurrentUser(auth);
+        if (user == null) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Authentication required"));
+        }
+
+        Long roadId = body.get("roadId") != null
+                ? Long.valueOf(String.valueOf(body.get("roadId")))
+                : null;
+
+        if (roadId == null) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "roadId is required"));
+        }
+
+        if (favoriteRoadRepository.existsByUserIdAndRoadId(user.getId(), roadId)) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "Road already favorited"));
+        }
+
+        FavoriteRoad favorite = new FavoriteRoad(
+                user.getId(),
+                roadId,
+                str(body.get("roadName")),
+                str(body.get("roadCode"))
+        );
+
+        FavoriteRoad saved = favoriteRoadRepository.save(favorite);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+
+    @GetMapping("/favorite-roads")
+    public ResponseEntity<?> getMyFavoriteRoads(Authentication auth) {
+
+        User user = resolveCurrentUser(auth);
+        if (user == null) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Authentication required"));
+        }
+
+        List<FavoriteRoad> favorites =
+                favoriteRoadRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+
+        return ResponseEntity.ok(favorites);
+    }
+
+
+    @DeleteMapping("/favorite-roads/{roadId}")
+    public ResponseEntity<?> unfavoriteRoad(
+            Authentication auth,
+            @PathVariable Long roadId) {
+
+        User user = resolveCurrentUser(auth);
+        if (user == null) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Authentication required"));
+        }
+
+        if (!favoriteRoadRepository.existsByUserIdAndRoadId(user.getId(), roadId)) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Road not favorited"));
+        }
+
+        favoriteRoadRepository.deleteByUserIdAndRoadId(user.getId(), roadId);
+        return ResponseEntity.ok(Map.of("deleted", true, "roadId", roadId));
+    }
+
+
+    @GetMapping("/favorite-roads/check/{roadId}")
+    public ResponseEntity<?> checkFavorite(
+            Authentication auth,
+            @PathVariable Long roadId) {
+
+        User user = resolveCurrentUser(auth);
+        if (user == null) {
+            return ResponseEntity.ok(Map.of("favorited", false));
+        }
+
+        boolean favorited =
+                favoriteRoadRepository.existsByUserIdAndRoadId(user.getId(), roadId);
+
+        return ResponseEntity.ok(Map.of("favorited", favorited));
+    }
+
+
+    /* =========================================================
+       SAFE CAST HELPERS
+       ========================================================= */
+
+    private static String str(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static Double num(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+}

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -153,6 +154,28 @@ public class CitizenReportController {
         return ResponseEntity.ok(toResponse(savedReport));
     }
 
+    /**
+     * Updates only the status of a report.
+     *
+     * Allowed statuses: PENDING, APPROVED, REJECTED, RESOLVED.
+     *
+     * Example:
+     * PATCH /api/reports/5/status
+     * { "status": "APPROVED" }
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<CitizenReportResponse> updateReportStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+
+        String newStatus = body != null ? body.get("status") : null;
+
+        CitizenReport updatedReport =
+                citizenReportService.updateStatus(id, newStatus);
+
+        return ResponseEntity.ok(toResponse(updatedReport));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReport(
             @PathVariable Long id) {
@@ -235,8 +258,16 @@ public class CitizenReportController {
                         ? report.getRoad().getId()
                         : null,
 
+                report.getRoad() != null
+                        ? report.getRoad().getName()
+                        : null,
+
                 report.getLocation() != null
                         ? report.getLocation().getId()
+                        : null,
+
+                report.getLocation() != null
+                        ? report.getLocation().getName()
                         : null,
 
                 report.getReportType(),

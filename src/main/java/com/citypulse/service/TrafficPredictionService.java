@@ -319,6 +319,13 @@ public class TrafficPredictionService {
         // Baseline future values
         // ---------------------------------------------------------
 
+                // Dampen the base values so weather + trend don't
+        // always push congestion/density past 100.
+        // Cap at 78 before adjustments — leaves headroom
+        // for weather to add up to +22 without saturation.
+        double baseDensity = Math.min(currentDensity, 78.0);
+        double baseCongestion = Math.min(currentCongestion, 78.0);
+
         double predictedVehicleCount =
                 currentVehicleCount
                         + ((currentVehicleCount * vehicleTrend)
@@ -330,13 +337,13 @@ public class TrafficPredictionService {
                         * trendFactor);
 
         double predictedDensity =
-                currentDensity
-                        + ((currentDensity * densityTrend)
+                baseDensity
+                        + ((baseDensity * densityTrend)
                         * trendFactor);
 
         double predictedCongestion =
-                currentCongestion
-                        + ((currentCongestion * congestionTrend)
+                baseCongestion
+                        + ((baseCongestion * congestionTrend)
                         * trendFactor);
 
         // ---------------------------------------------------------
@@ -392,10 +399,10 @@ public class TrafficPredictionService {
                         - (0.20 * weatherFactor);
 
         double densityWeatherAdjustment =
-                15.0 * weatherFactor;
+                8.0 * weatherFactor;
 
         double congestionWeatherAdjustment =
-                20.0 * weatherFactor;
+                12.0 * weatherFactor;
 
         predictedVehicleCount =
                 predictedVehicleCount

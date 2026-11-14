@@ -3,8 +3,8 @@ package com.citypulse.controller;
 import com.citypulse.dto.LoginRequest;
 import com.citypulse.dto.LoginResponse;
 import com.citypulse.dto.UserRequest;
-import com.citypulse.dto.UserResponse;
 import com.citypulse.model.User;
+import com.citypulse.security.JwtUtil;
 import com.citypulse.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,13 +20,16 @@ public class AuthController {
 
     private final UserService userService;
     private final AuthenticationManager authenticationManager;
+    private final JwtUtil jwtUtil;
 
     public AuthController(
             UserService userService,
-            AuthenticationManager authenticationManager) {
+            AuthenticationManager authenticationManager,
+            JwtUtil jwtUtil) {
 
         this.userService = userService;
         this.authenticationManager = authenticationManager;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/register")
@@ -58,13 +61,21 @@ public class AuthController {
 
         User savedUser = userService.createUser(user);
 
-        UserResponse response = new UserResponse(
+        /* Issue a JWT immediately so the user is logged in
+         * automatically after registration. */
+        String token = jwtUtil.generateToken(
+                savedUser.getId(),
+                savedUser.getEmail(),
+                savedUser.getRole()
+        );
+
+        LoginResponse response = new LoginResponse(
                 savedUser.getId(),
                 savedUser.getFullName(),
                 savedUser.getEmail(),
                 savedUser.getRole(),
-                savedUser.getPhone(),
-                savedUser.getActive()
+                token,
+                "Registration successful"
         );
 
         return ResponseEntity
@@ -90,14 +101,59 @@ public class AuthController {
                         new RuntimeException("User not found")
                 );
 
+        String token = jwtUtil.generateToken(
+                user.getId(),
+                user.getEmail(),
+                user.getRole()
+        );
+
         LoginResponse response = new LoginResponse(
                 user.getId(),
                 user.getFullName(),
                 user.getEmail(),
                 user.getRole(),
+                token,
                 "Login successful"
         );
 
-        return ResponseEntity.ok(response);
+                return ResponseEntity.ok(response);
+    }
+
+    /* =========================================================
+       CURRENT USER (used by frontend session restore)
+       ========================================================= */
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
+
+        if (authentication == null
+                || authentication.getName() == null
+                || authentication.getName().isBlank()) {
+
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Not authenticated");
+        }
+
+        return userService
+                .getUserByEmail(authentication.getName())
+                .<ResponseEntity<?>>map(user -> {
+
+                    java.util.Map<String, Object> profile =
+                            new java.util.LinkedHashMap<>();
+
+                    profile.put("id", user.getId());
+                    profile.put("fullName", user.getFullName());
+                    profile.put("email", user.getEmail());
+                    profile.put("role", user.getRole());
+                    profile.put("phone", user.getPhone());
+                    profile.put("active", user.getActive());
+
+                    return ResponseEntity.ok(profile);
+
+                })
+                .orElseGet(() -> ResponseEntity
+                        .status(HttpStatus.UNAUTHORIZED)
+                        .body("User not found"));
     }
 }

@@ -197,6 +197,48 @@ public class GlobalMapController {
         add("Vanuatu", "VU", -15.3767, 166.9592, "Oceania", "Port Vila", 319137L, "VUV", "Pacific/Efate");
         add("Solomon Islands", "SB", -9.6457, 160.1562, "Oceania", "Honiara", 707851L, "SBD", "Pacific/Guadalcanal");
 
+                // ============================================
+        // FINAL MISSING COUNTRIES (39) — no duplicates
+        // ============================================
+        add("Andorra", "AD", 42.5063, 1.5218, "Europe", "Andorra la Vella", 77265L, "EUR", "Europe/Andorra");
+        add("Antigua and Barbuda", "AG", 17.0608, -61.7964, "Americas", "Saint John's", 93219L, "XCD", "America/Antigua");
+        add("Bahamas", "BS", 25.0343, -77.3963, "Americas", "Nassau", 407906L, "BSD", "America/Nassau");
+        add("Barbados", "BB", 13.1939, -59.5432, "Americas", "Bridgetown", 287025L, "BBD", "America/Barbados");
+        add("Brunei", "BN", 4.5353, 114.7277, "Asia", "Bandar Seri Begawan", 445373L, "BND", "Asia/Brunei");
+        add("Cabo Verde", "CV", 16.5388, -23.0418, "Africa", "Praia", 587925L, "CVE", "Atlantic/Cape_Verde");
+        add("Central African Republic", "CF", 6.6111, 20.9394, "Africa", "Bangui", 5576651L, "XAF", "Africa/Bangui");
+        add("Comoros", "KM", -11.6455, 43.3333, "Africa", "Moroni", 821625L, "KMF", "Indian/Comoro");
+        add("Dominica", "DM", 15.4150, -61.3710, "Americas", "Roseau", 71986L, "XCD", "America/Dominica");
+        add("Equatorial Guinea", "GQ", 1.6508, 10.2679, "Africa", "Malabo", 1674908L, "XAF", "Africa/Malabo");
+        add("Eswatini", "SZ", -26.5225, 31.4659, "Africa", "Mbabane", 1192271L, "SZL", "Africa/Mbabane");
+        add("Gabon", "GA", -0.8037, 11.6094, "Africa", "Libreville", 2341179L, "XAF", "Africa/Libreville");
+        add("Gambia", "GM", 13.4432, -15.3101, "Africa", "Banjul", 2705992L, "GMD", "Africa/Banjul");
+        add("Grenada", "GD", 12.1165, -61.6790, "Americas", "Saint George's", 112519L, "XCD", "America/Grenada");
+        add("Guinea", "GN", 9.9456, -9.6966, "Africa", "Conakry", 13531906L, "GNF", "Africa/Conakry");
+        add("Guinea-Bissau", "GW", 11.8037, -15.1804, "Africa", "Bissau", 2060721L, "XOF", "Africa/Bissau");
+        add("Kosovo", "XK", 42.6026, 20.9030, "Europe", "Pristina", 1770134L, "EUR", "Europe/Belgrade");
+        add("Lesotho", "LS", -29.6099, 28.2336, "Africa", "Maseru", 2142249L, "LSL", "Africa/Maseru");
+        add("Liberia", "LR", 6.4281, -9.4295, "Africa", "Monrovia", 5193416L, "LRD", "Africa/Monrovia");
+        add("Liechtenstein", "LI", 47.1660, 9.5554, "Europe", "Vaduz", 39039L, "CHF", "Europe/Vaduz");
+        add("Maldives", "MV", 3.2028, 73.2207, "Asia", "Male", 521457L, "MVR", "Indian/Maldives");
+        add("Mauritania", "MR", 21.0079, -10.9408, "Africa", "Nouakchott", 4736390L, "MRU", "Africa/Nouakchott");
+        add("Monaco", "MC", 43.7384, 7.4246, "Europe", "Monaco", 39244L, "EUR", "Europe/Monaco");
+        add("North Korea", "KP", 40.3399, 127.5101, "Asia", "Pyongyang", 25778816L, "KPW", "Asia/Pyongyang");
+        add("Republic of the Congo", "CG", -0.2280, 15.8277, "Africa", "Brazzaville", 5835806L, "XAF", "Africa/Brazzaville");
+        add("Rwanda", "RW", -1.9403, 29.8739, "Africa", "Kigali", 13276947L, "RWF", "Africa/Kigali");
+        add("Saint Kitts and Nevis", "KN", 17.3578, -62.7830, "Americas", "Basseterre", 53192L, "XCD", "America/St_Kitts");
+        add("Saint Lucia", "LC", 13.9094, -60.9789, "Americas", "Castries", 183629L, "XCD", "America/St_Lucia");
+        add("Saint Vincent and the Grenadines", "VC", 12.9843, -61.2872, "Americas", "Kingstown", 110947L, "XCD", "America/St_Vincent");
+        add("San Marino", "SM", 43.9424, 12.4578, "Europe", "San Marino", 33938L, "EUR", "Europe/San_Marino");
+        add("Sao Tome and Principe", "ST", 0.1864, 6.6131, "Africa", "Sao Tome", 227380L, "STN", "Africa/Sao_Tome");
+        add("Sierra Leone", "SL", 8.4606, -11.7799, "Africa", "Freetown", 8420641L, "SLE", "Africa/Freetown");
+        add("South Sudan", "SS", 6.8770, 31.3070, "Africa", "Juba", 11088796L, "SSP", "Africa/Juba");
+        add("Timor-Leste", "TL", -8.8742, 125.7275, "Asia", "Dili", 1320942L, "USD", "Asia/Dili");
+        add("Togo", "TG", 8.6195, 0.8248, "Africa", "Lome", 8672413L, "XOF", "Africa/Lome");
+        add("Trinidad and Tobago", "TT", 10.6918, -61.2225, "Americas", "Port of Spain", 1399488L, "TTD", "America/Port_of_Spain");
+        add("Vatican City", "VA", 41.9029, 12.4534, "Europe", "Vatican City", 1000L, "EUR", "Europe/Vatican");
+        add("Antarctica", "AQ", -82.8628, 135.0000, "Antarctica", "Research Stations", 1000L, "N/A", "Antarctica/McMurdo");
+                
         // ============================================
         // CITY DATASET
         // ============================================
@@ -336,10 +378,7 @@ public class GlobalMapController {
                 city("Da Nang", 16.0544, 108.2022, "MEDIUM", "PORT"));
 
         // ============================================
-        // REGIONAL TRAFFIC PROFILES
-        // Honest labeling: these are ESTIMATED profiles
-        // based on regional urban mobility patterns.
-        // They are NOT real-time traffic observations.
+        // REGIONAL TRAFFIC PROFILES (ESTIMATED)
         // ============================================
         traffic("IN", "HIGH", "08:00-11:00, 17:00-20:00", "INBOUND", "MEGA_METRO");
         traffic("US", "MODERATE", "07:00-09:30, 16:30-19:00", "INBOUND", "MEGA_METRO");
@@ -574,8 +613,7 @@ public class GlobalMapController {
 
         int citiesTracked = cityList.size();
 
-        TrafficProfile profile =
-                COUNTRY_TRAFFIC.get(countryCode);
+        TrafficProfile profile = COUNTRY_TRAFFIC.get(countryCode);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("country", country.name());
@@ -583,10 +621,10 @@ public class GlobalMapController {
         result.put("region", country.region());
 
         if (profile == null) {
-            // Honest label: no regional profile available for this country
             result.put("coverageStatus", "UNAVAILABLE");
             result.put("dataSource", "NO_REGIONAL_PROFILE");
             result.put("trafficRiskLevel", null);
+            result.put("congestionRiskLevel", null);
             result.put("peakHours", null);
             result.put("peakDirection", null);
             result.put("urbanProfile", null);
@@ -600,6 +638,7 @@ public class GlobalMapController {
         result.put("coverageStatus", "ESTIMATED");
         result.put("dataSource", "REGIONAL_PROFILE");
         result.put("trafficRiskLevel", profile.riskLevel());
+        result.put("congestionRiskLevel", profile.riskLevel());
         result.put("peakHours", profile.peakHours());
         result.put("peakDirection", profile.peakDirection());
         result.put("urbanProfile", profile.urbanProfile());
@@ -609,6 +648,186 @@ public class GlobalMapController {
                 "Estimated regional profile. Not a real-time traffic observation.");
 
         return ResponseEntity.ok(result);
+    }
+
+    // ============================================
+    // GET /api/global/countries/{code}/traffic
+    // Compatibility alias for traffic-summary
+    // ============================================
+    @GetMapping("/countries/{code}/traffic")
+    public ResponseEntity<Map<String, Object>> getCountryTraffic(
+            @PathVariable String code) {
+        return getCountryTrafficSummary(code);
+    }
+
+    // ============================================
+    // GET /api/global/traffic/{code}/{city}
+    // City-level regional traffic profile
+    // ============================================
+    @GetMapping("/traffic/{code}/{city}")
+    public ResponseEntity<Map<String, Object>> getCityTraffic(
+            @PathVariable String code,
+            @PathVariable String city) {
+
+        String countryCode = code.toUpperCase();
+        CountryData country = COUNTRIES.get(countryCode);
+
+        if (country == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        CityData selectedCity = COUNTRY_CITIES
+                .getOrDefault(countryCode, List.of())
+                .stream()
+                .filter(item -> item.name().equalsIgnoreCase(city))
+                .findFirst()
+                .orElse(null);
+
+        if (selectedCity == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        TrafficProfile profile = COUNTRY_TRAFFIC.get(countryCode);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("country", country.name());
+        result.put("code", country.code());
+        result.put("region", country.region());
+        result.put("city", selectedCity.name());
+        result.put("latitude", selectedCity.latitude());
+        result.put("longitude", selectedCity.longitude());
+        result.put("tier", selectedCity.tier());
+        result.put("type", selectedCity.type());
+
+        if (profile == null) {
+            result.put("coverageStatus", "UNAVAILABLE");
+            result.put("dataSource", "NO_REGIONAL_PROFILE");
+            result.put("trafficRiskLevel", null);
+            result.put("congestionRiskLevel", null);
+            result.put("peakHours", null);
+            result.put("peakDirection", null);
+            result.put("urbanProfile", null);
+            result.put("note",
+                    "No regional traffic profile is available. No live city-level observation is available from this dataset.");
+        } else {
+            result.put("coverageStatus", "ESTIMATED");
+            result.put("dataSource", "COUNTRY_REGIONAL_PROFILE");
+            result.put("trafficRiskLevel", profile.riskLevel());
+            result.put("congestionRiskLevel", profile.riskLevel());
+            result.put("peakHours", profile.peakHours());
+            result.put("peakDirection", profile.peakDirection());
+            result.put("urbanProfile", profile.urbanProfile());
+            result.put("note",
+                    "Estimated country-level profile applied to this tracked city; this is not a real-time city traffic observation.");
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    // ============================================
+    // GET /api/global/cities
+    // All cities explicitly included in this dataset
+    // ============================================
+    @GetMapping("/cities")
+    public ResponseEntity<List<Map<String, Object>>> getAllCities() {
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        COUNTRY_CITIES.forEach((countryCode, cityList) -> {
+            CountryData country = COUNTRIES.get(countryCode);
+
+            if (country == null) {
+                return;
+            }
+
+            for (CityData city : cityList) {
+                Map<String, Object> cityMap = new LinkedHashMap<>();
+                cityMap.put("name", city.name());
+                cityMap.put("country", country.name());
+                cityMap.put("countryCode", country.code());
+                cityMap.put("region", country.region());
+                cityMap.put("latitude", city.latitude());
+                cityMap.put("longitude", city.longitude());
+                cityMap.put("tier", city.tier());
+                cityMap.put("type", city.type());
+                result.add(cityMap);
+            }
+        });
+
+        result.sort(Comparator
+                .comparing((Map<String, Object> item) ->
+                        String.valueOf(item.get("country")))
+                .thenComparing(item -> String.valueOf(item.get("name"))));
+
+        return ResponseEntity.ok(result);
+    }
+
+    // ============================================
+    // GET /api/global/continents
+    // Distinct geographic regions represented by this dataset
+    // ============================================
+    @GetMapping("/continents")
+    public ResponseEntity<List<String>> getContinents() {
+        List<String> regions = COUNTRIES.values().stream()
+                .map(CountryData::region)
+                .distinct()
+                .sorted()
+                .toList();
+
+        return ResponseEntity.ok(regions);
+    }
+
+    // ============================================
+    // GET /api/global/summary
+    // Dataset coverage summary; does not imply live coverage
+    // ============================================
+    @GetMapping("/summary")
+    public ResponseEntity<Map<String, Object>> getGlobalSummary() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        Map<String, Long> countriesByRegion = new LinkedHashMap<>();
+
+        COUNTRIES.values().stream()
+                .map(CountryData::region)
+                .distinct()
+                .sorted()
+                .forEach(region -> countriesByRegion.put(
+                        region,
+                        COUNTRIES.values().stream()
+                                .filter(country -> country.region().equals(region))
+                                .count()));
+
+        int citiesTracked = COUNTRY_CITIES.values().stream()
+                .mapToInt(List::size)
+                .sum();
+
+        result.put("countriesTracked", COUNTRIES.size());
+        result.put("citiesTracked", citiesTracked);
+        result.put("regionsTracked", countriesByRegion.size());
+        result.put("countriesWithRegionalTrafficProfiles", COUNTRY_TRAFFIC.size());
+        result.put("countriesByRegion", countriesByRegion);
+        String highestConfiguredRisk = COUNTRY_TRAFFIC.values().stream()
+                .map(TrafficProfile::riskLevel)
+                .max(Comparator.comparingInt(GlobalMapController::riskRank))
+                .orElse(null);
+        result.put("congestionRiskLevel", highestConfiguredRisk);
+        result.put("dataSource", "STATIC_REGIONAL_DATASET");
+        result.put("coverageStatus", "ESTIMATED");
+        result.put("note",
+                "This summary describes the configured dataset. Regional traffic profiles are estimates, not live worldwide traffic measurements.");
+
+        return ResponseEntity.ok(result);
+    }
+
+    private static int riskRank(String riskLevel) {
+        if (riskLevel == null) {
+            return 0;
+        }
+
+        return switch (riskLevel.toUpperCase()) {
+            case "SEVERE" -> 4;
+            case "HIGH" -> 3;
+            case "MODERATE" -> 2;
+            case "LOW" -> 1;
+            default -> 0;
+        };
     }
 
     // ============================================

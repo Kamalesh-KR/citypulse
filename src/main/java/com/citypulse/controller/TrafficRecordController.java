@@ -1,493 +1,402 @@
 package com.citypulse.controller;
 
-import com.citypulse.dto.CongestionResponse;
-import com.citypulse.dto.TrafficAnalysisResponse;
-import com.citypulse.dto.TrafficAnomalyResponse;
-import com.citypulse.dto.TrafficHistoricalAnalyticsResponse;
-import com.citypulse.dto.TrafficRecordRequest;
-import com.citypulse.dto.TrafficRecordResponse;
-import com.citypulse.model.Location;
-import com.citypulse.model.Road;
+import com.citypulse.dto.HourlyHeatmapResponse;
 import com.citypulse.model.TrafficRecord;
-import com.citypulse.service.LocationService;
-import com.citypulse.service.RoadService;
+import com.citypulse.repository.RoadRepository;
 import com.citypulse.service.TrafficRecordService;
-import jakarta.validation.Valid;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/traffic")
 public class TrafficRecordController {
 
     private final TrafficRecordService trafficRecordService;
-    private final RoadService roadService;
-    private final LocationService locationService;
+    private final RoadRepository roadRepository;
 
     public TrafficRecordController(
             TrafficRecordService trafficRecordService,
-            RoadService roadService,
-            LocationService locationService) {
+            RoadRepository roadRepository) {
 
         this.trafficRecordService = trafficRecordService;
-        this.roadService = roadService;
-        this.locationService = locationService;
+        this.roadRepository = roadRepository;
     }
 
-    // =========================================================
-    // TRAFFIC RECORDS
-    // =========================================================
+
+    /* =========================================================
+       BASIC QUERY ENDPOINTS
+       ========================================================= */
 
     @GetMapping
-    public ResponseEntity<List<TrafficRecordResponse>> getAllTrafficRecords() {
-
-        List<TrafficRecordResponse> records = trafficRecordService
-                .getAllTrafficRecords()
-                .stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(records);
+    public ResponseEntity<List<TrafficRecord>> getAllTrafficRecords() {
+        return ResponseEntity.ok(
+                trafficRecordService.getAllTrafficRecords()
+        );
     }
-
-    // =========================================================
-    // LIVE TRAFFIC
-    // =========================================================
 
     @GetMapping("/live")
-    public ResponseEntity<List<TrafficRecordResponse>> getLiveTrafficRecords() {
-
-        List<TrafficRecordResponse> records = trafficRecordService
-                .getLiveTrafficRecords()
-                .stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(records);
+    public ResponseEntity<List<TrafficRecord>> getLiveTraffic() {
+        return ResponseEntity.ok(
+                trafficRecordService.getLiveTrafficRecords()
+        );
     }
-
-    // =========================================================
-    // TRAFFIC ANALYSIS
-    // =========================================================
 
     @GetMapping("/analysis/road/{roadId}")
-    public ResponseEntity<TrafficAnalysisResponse> analyzeTrafficByRoad(
-            @PathVariable Long roadId) {
-
-        return trafficRecordService
-                .analyzeTrafficByRoad(roadId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> analyzeRoad(@PathVariable Long roadId) {
+        return trafficRecordService.analyzeTrafficByRoad(roadId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
-
-    // =========================================================
-    // CONGESTION DETECTION
-    // =========================================================
 
     @GetMapping("/congestion/road/{roadId}")
-    public ResponseEntity<CongestionResponse> detectCongestionByRoad(
-            @PathVariable Long roadId) {
-
-        return trafficRecordService
-                .detectCongestionByRoad(roadId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> getRoadCongestion(@PathVariable Long roadId) {
+        return trafficRecordService.detectCongestionByRoad(roadId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
-
-    // =========================================================
-    // TRAFFIC ANOMALY DETECTION
-    // =========================================================
 
     @GetMapping("/anomaly/road/{roadId}")
-    public ResponseEntity<TrafficAnomalyResponse> detectTrafficAnomalyByRoad(
-            @PathVariable Long roadId) {
-
-        return trafficRecordService
-                .detectTrafficAnomalyByRoad(roadId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> getRoadAnomaly(@PathVariable Long roadId) {
+        return trafficRecordService.detectTrafficAnomalyByRoad(roadId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // =========================================================
-    // HISTORICAL TRAFFIC ANALYTICS
-    // =========================================================
 
-    /**
-     * Returns historical analytics calculated from
-     * all traffic records currently stored in CityPulse.
-     *
-     * GET /api/traffic/analytics/historical
-     */
+    /* =========================================================
+       ANALYTICS — HISTORICAL
+       ========================================================= */
+
     @GetMapping("/analytics/historical")
-    public ResponseEntity<TrafficHistoricalAnalyticsResponse>
-    getHistoricalAnalytics() {
-
-        return trafficRecordService
-                .getHistoricalAnalytics()
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> getHistoricalAnalytics() {
+        return trafficRecordService.getHistoricalAnalytics()
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /**
-     * Returns historical analytics for a specific road.
-     *
-     * GET /api/traffic/analytics/historical/road/{roadId}
-     */
     @GetMapping("/analytics/historical/road/{roadId}")
-    public ResponseEntity<TrafficHistoricalAnalyticsResponse>
-    getHistoricalAnalyticsByRoad(
+    public ResponseEntity<?> getHistoricalAnalyticsByRoad(
             @PathVariable Long roadId) {
 
-        return trafficRecordService
-                .getHistoricalAnalyticsByRoad(roadId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return trafficRecordService.getHistoricalAnalyticsByRoad(roadId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /**
-     * Returns historical analytics for a specific location.
-     *
-     * GET /api/traffic/analytics/historical/location/{locationId}
-     */
     @GetMapping("/analytics/historical/location/{locationId}")
-    public ResponseEntity<TrafficHistoricalAnalyticsResponse>
-    getHistoricalAnalyticsByLocation(
+    public ResponseEntity<?> getHistoricalAnalyticsByLocation(
             @PathVariable Long locationId) {
 
-        return trafficRecordService
-                .getHistoricalAnalyticsByLocation(locationId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return trafficRecordService.getHistoricalAnalyticsByLocation(locationId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /**
-     * Returns historical analytics for a specific time range.
-     *
-     * GET /api/traffic/analytics/historical/between
-     * ?start=2026-09-23T19:00:00
-     * &end=2026-09-24T20:00:00
-     */
     @GetMapping("/analytics/historical/between")
-    public ResponseEntity<TrafficHistoricalAnalyticsResponse>
-    getHistoricalAnalyticsBetween(
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime start,
+    public ResponseEntity<?> getHistoricalAnalyticsBetween(
+            @RequestParam String start,
+            @RequestParam String end) {
 
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime end) {
-
-        return trafficRecordService
-                .getHistoricalAnalyticsBetween(start, end)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            LocalDateTime startDt = LocalDateTime.parse(start);
+            LocalDateTime endDt = LocalDateTime.parse(end);
+            return trafficRecordService.getHistoricalAnalyticsBetween(startDt, endDt)
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
-    // =========================================================
-    // GET TRAFFIC RECORD BY ID
-    // =========================================================
+
+    /* =========================================================
+       HOURLY TREND ANALYTICS
+       ========================================================= */
+
+    @GetMapping("/analytics/hourly/{roadId}")
+    public ResponseEntity<Map<String, Object>> getHourlyTrend(
+            @PathVariable Long roadId) {
+
+        List<TrafficRecord> records =
+                trafficRecordService.getTrafficRecordsByRoad(roadId);
+
+        if (records == null) {
+            records = new ArrayList<>();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("roadId", roadId);
+
+        if (records.isEmpty()) {
+            result.put("dataStatus", "UNAVAILABLE");
+            result.put("hourlyPattern", List.of());
+            result.put("totalRecords", 0);
+            result.put("note", "No traffic records available for this road.");
+            return ResponseEntity.ok(result);
+        }
+
+        String roadName = "Road " + roadId;
+        for (TrafficRecord r : records) {
+            if (r.getRoad() != null && r.getRoad().getName() != null) {
+                roadName = r.getRoad().getName();
+                break;
+            }
+        }
+        result.put("roadName", roadName);
+
+        Map<Integer, List<Double>> hourBuckets = new java.util.TreeMap<>();
+        for (int h = 0; h < 24; h++) {
+            hourBuckets.put(h, new ArrayList<>());
+        }
+
+        for (TrafficRecord r : records) {
+            if (r.getRecordedAt() == null || r.getCongestionScore() == null) continue;
+            int hour = r.getRecordedAt().getHour();
+            hourBuckets.get(hour).add(r.getCongestionScore().doubleValue());
+        }
+
+        List<Map<String, Object>> pattern = new ArrayList<>();
+        double peakAvg = -1.0;
+        int peakHour = -1;
+        double quietAvg = Double.MAX_VALUE;
+        int quietHour = -1;
+
+        for (Map.Entry<Integer, List<Double>> entry : hourBuckets.entrySet()) {
+
+            int hour = entry.getKey();
+            List<Double> values = entry.getValue();
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("hour", hour);
+
+            if (values.isEmpty()) {
+                row.put("avgCongestion", null);
+                row.put("sampleCount", 0);
+            } else {
+                double avg = values.stream()
+                        .mapToDouble(Double::doubleValue)
+                        .average()
+                        .orElse(0.0);
+                avg = Math.round(avg * 100.0) / 100.0;
+                row.put("avgCongestion", avg);
+                row.put("sampleCount", values.size());
+                if (avg > peakAvg) { peakAvg = avg; peakHour = hour; }
+                if (avg < quietAvg) { quietAvg = avg; quietHour = hour; }
+            }
+            pattern.add(row);
+        }
+
+        result.put("hourlyPattern", pattern);
+        result.put("peakHour", peakHour);
+        result.put("peakCongestion", peakAvg >= 0 ? peakAvg : null);
+        result.put("quietestHour", quietHour);
+        result.put("quietestCongestion", quietAvg < Double.MAX_VALUE ? quietAvg : null);
+        result.put("totalRecords", records.size());
+        result.put("dataStatus", "AVAILABLE");
+
+        return ResponseEntity.ok(result);
+    }
+
+
+    /* =========================================================
+       HOURLY HEATMAP ANALYTICS (FEATURE E1)
+       ========================================================= */
+
+    @GetMapping("/analytics/heatmap")
+    public ResponseEntity<HourlyHeatmapResponse> getHourlyHeatmap() {
+
+        // 1. Load all roads
+        List<com.citypulse.model.Road> allRoads = roadRepository.findAll();
+
+        List<HourlyHeatmapResponse.RoadHeatmap> roads = new ArrayList<>();
+        double maxCongestion = 0.0;
+
+        // 2. For each road, reuse getTrafficRecordsByRoad()
+        //    (same code path as /analytics/hourly/{roadId} which works)
+        for (com.citypulse.model.Road road : allRoads) {
+
+            List<TrafficRecord> records =
+                    trafficRecordService.getTrafficRecordsByRoad(road.getId());
+
+            if (records == null) records = new ArrayList<>();
+
+            Map<Integer, List<Double>> hourBuckets = new java.util.TreeMap<>();
+            for (int h = 0; h < 24; h++) {
+                hourBuckets.put(h, new ArrayList<>());
+            }
+
+            for (TrafficRecord r : records) {
+                if (r == null) continue;
+                if (r.getRecordedAt() == null) continue;
+                if (r.getCongestionScore() == null) continue;
+                int hour = r.getRecordedAt().getHour();
+                hourBuckets.get(hour).add(r.getCongestionScore().doubleValue());
+            }
+
+            List<HourlyHeatmapResponse.HeatmapCell> cells = new ArrayList<>();
+            int peakHour = -1;
+            double peakCongestion = -1.0;
+
+            for (Map.Entry<Integer, List<Double>> hourEntry : hourBuckets.entrySet()) {
+
+                int hour = hourEntry.getKey();
+                List<Double> values = hourEntry.getValue();
+
+                Double avg = null;
+                if (!values.isEmpty()) {
+                    double raw = values.stream()
+                            .mapToDouble(Double::doubleValue)
+                            .average()
+                            .orElse(0.0);
+                    avg = Math.round(raw * 100.0) / 100.0;
+                }
+
+                cells.add(new HourlyHeatmapResponse.HeatmapCell(
+                        hour, avg, (long) values.size()));
+
+                if (avg != null && avg > peakCongestion) {
+                    peakCongestion = avg;
+                    peakHour = hour;
+                }
+                if (avg != null && avg > maxCongestion) {
+                    maxCongestion = avg;
+                }
+            }
+
+            String roadName = road.getName() != null
+                    ? road.getName()
+                    : "Road " + road.getId();
+
+            roads.add(new HourlyHeatmapResponse.RoadHeatmap(
+                    road.getId(),
+                    roadName,
+                    cells,
+                    peakHour >= 0 ? peakHour : null,
+                    peakCongestion >= 0 ? peakCongestion : null));
+        }
+
+        List<Integer> hours = new ArrayList<>();
+        for (int h = 0; h < 24; h++) hours.add(h);
+
+        HourlyHeatmapResponse response = new HourlyHeatmapResponse(
+                hours,
+                roads,
+                Math.round(maxCongestion * 100.0) / 100.0,
+                roads.size(),
+                LocalDateTime.now().toString());
+
+        return ResponseEntity.ok(response);
+    }
+
+
+    /* =========================================================
+       SINGLE RECORD LOOKUPS
+       ========================================================= */
 
     @GetMapping("/{id}")
-    public ResponseEntity<TrafficRecordResponse> getTrafficRecordById(
+    public ResponseEntity<TrafficRecord> getTrafficRecordById(
             @PathVariable Long id) {
 
-        return trafficRecordService
-                .getTrafficRecordById(id)
-                .map(this::convertToResponse)
+        return trafficRecordService.getTrafficRecordById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
-    // =========================================================
-    // LATEST TRAFFIC BY ROAD
-    // =========================================================
 
     @GetMapping("/road/{roadId}/latest")
-    public ResponseEntity<TrafficRecordResponse> getLatestTrafficRecordByRoad(
+    public ResponseEntity<TrafficRecord> getLatestByRoad(
             @PathVariable Long roadId) {
 
-        return trafficRecordService
-                .getLatestTrafficRecordByRoad(roadId)
-                .map(this::convertToResponse)
+        return trafficRecordService.getLatestTrafficRecordByRoad(roadId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
-    // =========================================================
-    // LATEST TRAFFIC BY LOCATION
-    // =========================================================
 
     @GetMapping("/location/{locationId}/latest")
-    public ResponseEntity<TrafficRecordResponse> getLatestTrafficRecordByLocation(
+    public ResponseEntity<TrafficRecord> getLatestByLocation(
             @PathVariable Long locationId) {
 
-        return trafficRecordService
-                .getLatestTrafficRecordByLocation(locationId)
-                .map(this::convertToResponse)
+        return trafficRecordService.getLatestTrafficRecordByLocation(locationId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // =========================================================
-    // TRAFFIC BY ROAD
-    // =========================================================
-
     @GetMapping("/road/{roadId}")
-    public ResponseEntity<List<TrafficRecordResponse>> getTrafficRecordsByRoad(
+    public ResponseEntity<List<TrafficRecord>> getByRoad(
             @PathVariable Long roadId) {
 
-        List<TrafficRecordResponse> records = trafficRecordService
-                .getTrafficRecordsByRoad(roadId)
-                .stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(records);
+        return ResponseEntity.ok(
+                trafficRecordService.getTrafficRecordsByRoad(roadId)
+        );
     }
-
-    // =========================================================
-    // TRAFFIC BY LOCATION
-    // =========================================================
 
     @GetMapping("/location/{locationId}")
-    public ResponseEntity<List<TrafficRecordResponse>> getTrafficRecordsByLocation(
+    public ResponseEntity<List<TrafficRecord>> getByLocation(
             @PathVariable Long locationId) {
 
-        List<TrafficRecordResponse> records = trafficRecordService
-                .getTrafficRecordsByLocation(locationId)
-                .stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(records);
+        return ResponseEntity.ok(
+                trafficRecordService.getTrafficRecordsByLocation(locationId)
+        );
     }
-
-    // =========================================================
-    // TRAFFIC BY LEVEL
-    // =========================================================
 
     @GetMapping("/level/{trafficLevel}")
-    public ResponseEntity<List<TrafficRecordResponse>> getTrafficRecordsByTrafficLevel(
+    public ResponseEntity<List<TrafficRecord>> getByLevel(
             @PathVariable String trafficLevel) {
 
-        List<TrafficRecordResponse> records = trafficRecordService
-                .getTrafficRecordsByTrafficLevel(trafficLevel)
-                .stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(records);
+        return ResponseEntity.ok(
+                trafficRecordService.getTrafficRecordsByTrafficLevel(trafficLevel)
+        );
     }
-
-    // =========================================================
-    // TRAFFIC BETWEEN TWO TIMES
-    // =========================================================
 
     @GetMapping("/between")
-    public ResponseEntity<List<TrafficRecordResponse>> getTrafficRecordsBetween(
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime start,
+    public ResponseEntity<List<TrafficRecord>> getBetween(
+            @RequestParam String start,
+            @RequestParam String end) {
 
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime end) {
-
-        List<TrafficRecordResponse> records = trafficRecordService
-                .getTrafficRecordsBetween(start, end)
-                .stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(records);
+        try {
+            LocalDateTime startDt = LocalDateTime.parse(start);
+            LocalDateTime endDt = LocalDateTime.parse(end);
+            return ResponseEntity.ok(
+                    trafficRecordService.getTrafficRecordsBetween(startDt, endDt)
+            );
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
-    // =========================================================
-    // CREATE TRAFFIC RECORD
-    // =========================================================
+
+    /* =========================================================
+       CRUD
+       ========================================================= */
 
     @PostMapping
-    public ResponseEntity<?> createTrafficRecord(
-            @Valid @RequestBody TrafficRecordRequest request) {
-
-        Road road = roadService
-                .getRoadById(request.getRoadId())
-                .orElse(null);
-
-        if (road == null) {
-            return ResponseEntity
-                    .status(HttpStatus.NOT_FOUND)
-                    .body("Road not found with id: " + request.getRoadId());
-        }
-
-        Location location = locationService
-                .getLocationById(request.getLocationId())
-                .orElse(null);
-
-        if (location == null) {
-            return ResponseEntity
-                    .status(HttpStatus.NOT_FOUND)
-                    .body("Location not found with id: " + request.getLocationId());
-        }
-
-        TrafficRecord trafficRecord =
-                convertToEntity(request, road, location);
-
-        TrafficRecord savedRecord =
-                trafficRecordService.createTrafficRecord(
-                        trafficRecord
-                );
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(convertToResponse(savedRecord));
-    }
-
-    // =========================================================
-    // UPDATE TRAFFIC RECORD
-    // =========================================================
-
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateTrafficRecord(
-            @PathVariable Long id,
-            @Valid @RequestBody TrafficRecordRequest request) {
-
-        Road road = roadService
-                .getRoadById(request.getRoadId())
-                .orElse(null);
-
-        if (road == null) {
-            return ResponseEntity
-                    .status(HttpStatus.NOT_FOUND)
-                    .body("Road not found with id: " + request.getRoadId());
-        }
-
-        Location location = locationService
-                .getLocationById(request.getLocationId())
-                .orElse(null);
-
-        if (location == null) {
-            return ResponseEntity
-                    .status(HttpStatus.NOT_FOUND)
-                    .body("Location not found with id: " + request.getLocationId());
-        }
-
-        TrafficRecord trafficRecord =
-                convertToEntity(request, road, location);
-
-        TrafficRecord updatedRecord =
-                trafficRecordService.updateTrafficRecord(
-                        id,
-                        trafficRecord
-                );
+    public ResponseEntity<TrafficRecord> createTrafficRecord(
+            @RequestBody TrafficRecord record) {
 
         return ResponseEntity.ok(
-                convertToResponse(updatedRecord)
+                trafficRecordService.createTrafficRecord(record)
         );
     }
 
-    // =========================================================
-    // DELETE TRAFFIC RECORD
-    // =========================================================
+    @PutMapping("/{id}")
+    public ResponseEntity<TrafficRecord> updateTrafficRecord(
+            @PathVariable Long id,
+            @RequestBody TrafficRecord record) {
+
+        return ResponseEntity.ok(
+                trafficRecordService.updateTrafficRecord(id, record)
+        );
+    }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTrafficRecord(
-            @PathVariable Long id) {
+    public ResponseEntity<Void> deleteTrafficRecord(@PathVariable Long id) {
 
         trafficRecordService.deleteTrafficRecord(id);
-
         return ResponseEntity.noContent().build();
-    }
-
-    // =========================================================
-    // REQUEST → ENTITY
-    // =========================================================
-
-    private TrafficRecord convertToEntity(
-            TrafficRecordRequest request,
-            Road road,
-            Location location) {
-
-        TrafficRecord trafficRecord = new TrafficRecord();
-
-        trafficRecord.setRoad(road);
-        trafficRecord.setLocation(location);
-
-        trafficRecord.setVehicleCount(
-                request.getVehicleCount()
-        );
-
-        if (request.getAverageSpeed() != null) {
-            trafficRecord.setAverageSpeed(
-                    BigDecimal.valueOf(
-                            request.getAverageSpeed()
-                    )
-            );
-        }
-
-        if (request.getTrafficDensity() != null) {
-            trafficRecord.setTrafficDensity(
-                    BigDecimal.valueOf(
-                            request.getTrafficDensity()
-                    )
-            );
-        }
-
-        trafficRecord.setTrafficLevel(
-                request.getTrafficLevel()
-        );
-
-        if (request.getCongestionScore() != null) {
-            trafficRecord.setCongestionScore(
-                    BigDecimal.valueOf(
-                            request.getCongestionScore()
-                    )
-            );
-        }
-
-        trafficRecord.setRecordedAt(
-                request.getRecordedAt()
-        );
-
-        trafficRecord.setDataSource(
-                request.getDataSource()
-        );
-
-        return trafficRecord;
-    }
-
-    // =========================================================
-    // ENTITY → RESPONSE
-    // =========================================================
-
-    private TrafficRecordResponse convertToResponse(
-            TrafficRecord trafficRecord) {
-
-        return new TrafficRecordResponse(
-                trafficRecord.getId(),
-                trafficRecord.getRoad().getId(),
-                trafficRecord.getLocation().getId(),
-                trafficRecord.getVehicleCount(),
-                trafficRecord.getAverageSpeed() != null
-                        ? trafficRecord.getAverageSpeed().doubleValue()
-                        : null,
-                trafficRecord.getTrafficDensity() != null
-                        ? trafficRecord.getTrafficDensity().doubleValue()
-                        : null,
-                trafficRecord.getTrafficLevel(),
-                trafficRecord.getCongestionScore() != null
-                        ? trafficRecord.getCongestionScore().doubleValue()
-                        : null,
-                trafficRecord.getRecordedAt(),
-                trafficRecord.getDataSource()
-        );
     }
 }

@@ -5,6 +5,7 @@ import com.citypulse.dto.WorldwideRouteRequest;
 import com.citypulse.routing.GeocodingService;
 import com.citypulse.routing.GraphHopperRoutingService;
 import com.citypulse.service.RouteTrafficAnalysisService;
+import com.citypulse.service.RouteWeatherEnricher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,11 +21,13 @@ public class WorldwideRoutingController {
     private final GraphHopperRoutingService graphHopperRoutingService;
     private final GeocodingService geocodingService;
     private final RouteTrafficAnalysisService routeTrafficAnalysisService;
+    private final RouteWeatherEnricher routeWeatherEnricher;
 
     public WorldwideRoutingController(
             GraphHopperRoutingService graphHopperRoutingService,
             GeocodingService geocodingService,
-            RouteTrafficAnalysisService routeTrafficAnalysisService) {
+            RouteTrafficAnalysisService routeTrafficAnalysisService,
+            RouteWeatherEnricher routeWeatherEnricher) {
 
         this.graphHopperRoutingService =
                 graphHopperRoutingService;
@@ -34,6 +37,9 @@ public class WorldwideRoutingController {
 
         this.routeTrafficAnalysisService =
                 routeTrafficAnalysisService;
+
+        this.routeWeatherEnricher =
+                routeWeatherEnricher;
     }
 
     @GetMapping("/status")
@@ -154,6 +160,16 @@ public class WorldwideRoutingController {
         List<Map<String, Object>> trafficAnalysis =
                 routeTrafficAnalysisService.analyzeRoutes(
                         routeResponse);
+
+        // Feature #4 — enrich routes with weather based on destination
+        try {
+            routeWeatherEnricher.enrich(
+                    trafficAnalysis,
+                    destination.getLatitude(),
+                    destination.getLongitude());
+        } catch (Exception ignored) {
+            // Never break routing because of weather enrichment
+        }
 
         Map<String, Object> response =
                 new LinkedHashMap<>();

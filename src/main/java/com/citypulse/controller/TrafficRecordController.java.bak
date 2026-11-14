@@ -1,0 +1,454 @@
+package com.citypulse.controller;
+
+import com.citypulse.dto.HourlyHeatmapResponse;
+import com.citypulse.model.TrafficRecord;
+import com.citypulse.repository.RoadRepository;
+import com.citypulse.service.TrafficRecordService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/traffic")
+public class TrafficRecordController {
+
+    private final TrafficRecordService trafficRecordService;
+    private final RoadRepository roadRepository;
+
+    public TrafficRecordController(
+            TrafficRecordService trafficRecordService,
+            RoadRepository roadRepository) {
+
+        this.trafficRecordService = trafficRecordService;
+        this.roadRepository = roadRepository;
+    }
+
+
+    /* =========================================================
+       BASIC QUERY ENDPOINTS
+       ========================================================= */
+
+    @GetMapping
+    public ResponseEntity<List<TrafficRecord>> getAllTrafficRecords() {
+        return ResponseEntity.ok(
+                trafficRecordService.getAllTrafficRecords()
+        );
+    }
+
+    @GetMapping("/live")
+    public ResponseEntity<List<TrafficRecord>> getLiveTraffic() {
+        return ResponseEntity.ok(
+                trafficRecordService.getLiveTrafficRecords()
+        );
+    }
+
+    @GetMapping("/analysis/road/{roadId}")
+    public ResponseEntity<?> analyzeRoad(@PathVariable Long roadId) {
+        return trafficRecordService.analyzeTrafficByRoad(roadId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/congestion/road/{roadId}")
+    public ResponseEntity<?> getRoadCongestion(@PathVariable Long roadId) {
+        return trafficRecordService.detectCongestionByRoad(roadId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/anomaly/road/{roadId}")
+    public ResponseEntity<?> getRoadAnomaly(@PathVariable Long roadId) {
+        return trafficRecordService.detectTrafficAnomalyByRoad(roadId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+
+    /* =========================================================
+       ANALYTICS — HISTORICAL
+       ========================================================= */
+
+    @GetMapping("/analytics/historical")
+    public ResponseEntity<?> getHistoricalAnalytics() {
+        return trafficRecordService.getHistoricalAnalytics()
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/analytics/historical/road/{roadId}")
+    public ResponseEntity<?> getHistoricalAnalyticsByRoad(
+            @PathVariable Long roadId) {
+
+        return trafficRecordService.getHistoricalAnalyticsByRoad(roadId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/analytics/historical/location/{locationId}")
+    public ResponseEntity<?> getHistoricalAnalyticsByLocation(
+            @PathVariable Long locationId) {
+
+        return trafficRecordService.getHistoricalAnalyticsByLocation(locationId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/analytics/historical/between")
+    public ResponseEntity<?> getHistoricalAnalyticsBetween(
+            @RequestParam String start,
+            @RequestParam String end) {
+
+        try {
+            LocalDateTime startDt = LocalDateTime.parse(start);
+            LocalDateTime endDt = LocalDateTime.parse(end);
+            return trafficRecordService.getHistoricalAnalyticsBetween(startDt, endDt)
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+
+    /* =========================================================
+       HOURLY TREND ANALYTICS
+       ========================================================= */
+
+    /**
+     * Returns hourly congestion aggregates for a specific road.
+     *
+     * Groups all traffic records for the road by hour of day (0-23)
+     * and returns average congestion per hour, plus peak/quietest hour.
+     *
+     * GET /api/traffic/analytics/hourly/{roadId}
+     */
+    @GetMapping("/analytics/hourly/{roadId}")
+    public ResponseEntity<Map<String, Object>> getHourlyTrend(
+            @PathVariable Long roadId) {
+
+        List<TrafficRecord> records =
+                trafficRecordService.getTrafficRecordsByRoad(roadId);
+
+        if (records == null) {
+            records = new ArrayList<>();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("roadId", roadId);
+
+        if (records.isEmpty()) {
+            result.put("dataStatus", "UNAVAILABLE");
+            result.put("hourlyPattern", List.of());
+            result.put("totalRecords", 0);
+            result.put("note", "No traffic records available for this road.");
+            return ResponseEntity.ok(result);
+        }
+
+        String roadName = "Road " + roadId;
+        for (TrafficRecord r : records) {
+            if (r.getRoad() != null && r.getRoad().getName() != null) {
+                roadName = r.getRoad().getName();
+                break;
+            }
+        }
+        result.put("roadName", roadName);
+
+        Map<Integer, List<Double>> hourBuckets = new java.util.TreeMap<>();
+        for (int h = 0; h < 24; h++) {
+            hourBuckets.put(h, new ArrayList<>());
+        }
+
+        for (TrafficRecord r : records) {
+            if (r.getRecordedAt() == null || r.getCongestionScore() == null) continue;
+            int hour = r.getRecordedAt().getHour();
+            hourBuckets.get(hour).add(r.getCongestionScore().doubleValue());
+        }
+
+        List<Map<String, Object>> pattern = new ArrayList<>();
+        double peakAvg = -1.0;
+        int peakHour = -1;
+        double quietAvg = Double.MAX_VALUE;
+        int quietHour = -1;
+
+        for (Map.Entry<Integer, List<Double>> entry : hourBuckets.entrySet()) {
+
+            int hour = entry.getKey();
+            List<Double> values = entry.getValue();
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("hour", hour);
+
+            if (values.isEmpty()) {
+                row.put("avgCongestion", null);
+                row.put("sampleCount", 0);
+            } else {
+                double avg = values.stream()
+                        .mapToDouble(Double::doubleValue)
+                        .average()
+                        .orElse(0.0);
+                avg = Math.round(avg * 100.0) / 100.0;
+                row.put("avgCongestion", avg);
+                row.put("sampleCount", values.size());
+                if (avg > peakAvg) { peakAvg = avg; peakHour = hour; }
+                if (avg < quietAvg) { quietAvg = avg; quietHour = hour; }
+            }
+            pattern.add(row);
+        }
+
+        result.put("hourlyPattern", pattern);
+        result.put("peakHour", peakHour);
+        result.put("peakCongestion", peakAvg >= 0 ? peakAvg : null);
+        result.put("quietestHour", quietHour);
+        result.put("quietestCongestion", quietAvg < Double.MAX_VALUE ? quietAvg : null);
+        result.put("totalRecords", records.size());
+        result.put("dataStatus", "AVAILABLE");
+
+        return ResponseEntity.ok(result);
+    }
+
+
+    /* =========================================================
+       HOURLY HEATMAP ANALYTICS (FEATURE E1)
+       ========================================================= */
+
+    /**
+     * Returns a 24-hour congestion matrix across all roads
+     * in a single payload, for rendering a heatmap grid.
+     *
+     * GET /api/traffic/analytics/heatmap
+     *
+     * Data source: all live + historical traffic records.
+     * Aggregation: per road, per hour-of-day, averaging
+     * congestionScore and counting samples.
+     */
+    @GetMapping("/analytics/heatmap")
+    public ResponseEntity<HourlyHeatmapResponse> getHourlyHeatmap() {
+
+        List<TrafficRecord> allRecords =
+                trafficRecordService.getAllTrafficRecords();
+
+        if (allRecords == null) {
+            allRecords = new ArrayList<>();
+        }
+
+        // Group per road: roadId → (hour → list of congestion values)
+        Map<Long, Map<Integer, List<Double>>> byRoad =
+                new LinkedHashMap<>();
+
+        // Track road names as we encounter records
+        Map<Long, String> roadNames = new LinkedHashMap<>();
+
+        for (TrafficRecord r : allRecords) {
+
+            if (r.getRoad() == null || r.getRoad().getId() == null) continue;
+            if (r.getRecordedAt() == null) continue;
+            if (r.getCongestionScore() == null) continue;
+
+            Long roadId = r.getRoad().getId();
+            String rn = r.getRoad().getName();
+            if (rn != null && !roadNames.containsKey(roadId)) {
+                roadNames.put(roadId, rn);
+            }
+
+            int hour = r.getRecordedAt().getHour();
+            byRoad
+                    .computeIfAbsent(roadId, k -> new java.util.TreeMap<>())
+                    .computeIfAbsent(hour, k -> new ArrayList<>())
+                    .add(r.getCongestionScore().doubleValue());
+        }
+
+        // Fallback: pull road names from repository for roads
+        // that appear in byRoad but have no name yet
+        if (roadRepository != null) {
+            try {
+                for (Long roadId : byRoad.keySet()) {
+                    if (!roadNames.containsKey(roadId)) {
+                        roadRepository.findById(roadId)
+                                .ifPresent(road ->
+                                        roadNames.put(
+                                                roadId,
+                                                road.getName() != null
+                                                        ? road.getName()
+                                                        : "Road " + roadId
+                                        )
+                                );
+                    }
+                }
+            } catch (Exception ignored) {
+                // Non-fatal: fall back to "Road {id}"
+            }
+        }
+
+        List<HourlyHeatmapResponse.RoadHeatmap> roads = new ArrayList<>();
+        double maxCongestion = 0.0;
+
+        for (Map.Entry<Long, Map<Integer, List<Double>>> roadEntry
+                : byRoad.entrySet()) {
+
+            Long roadId = roadEntry.getKey();
+            String roadName = roadNames.getOrDefault(roadId, "Road " + roadId);
+
+            List<HourlyHeatmapResponse.HeatmapCell> cells = new ArrayList<>();
+
+            int peakHour = -1;
+            double peakCongestion = -1.0;
+
+            for (Map.Entry<Integer, List<Double>> hourEntry
+                    : roadEntry.getValue().entrySet()) {
+
+                int hour = hourEntry.getKey();
+                List<Double> values = hourEntry.getValue();
+
+                Double avg = null;
+                if (!values.isEmpty()) {
+                    double raw = values.stream()
+                            .mapToDouble(Double::doubleValue)
+                            .average()
+                            .orElse(0.0);
+                    avg = Math.round(raw * 100.0) / 100.0;
+                }
+
+                cells.add(new HourlyHeatmapResponse.HeatmapCell(
+                        hour, avg, (long) values.size()));
+
+                if (avg != null && avg > peakCongestion) {
+                    peakCongestion = avg;
+                    peakHour = hour;
+                }
+                if (avg != null && avg > maxCongestion) {
+                    maxCongestion = avg;
+                }
+            }
+
+            roads.add(new HourlyHeatmapResponse.RoadHeatmap(
+                    roadId,
+                    roadName,
+                    cells,
+                    peakHour >= 0 ? peakHour : null,
+                    peakCongestion >= 0 ? peakCongestion : null));
+        }
+
+        List<Integer> hours = new ArrayList<>();
+        for (int h = 0; h < 24; h++) hours.add(h);
+
+        HourlyHeatmapResponse response = new HourlyHeatmapResponse(
+                hours,
+                roads,
+                Math.round(maxCongestion * 100.0) / 100.0,
+                roads.size(),
+                LocalDateTime.now().toString());
+
+        return ResponseEntity.ok(response);
+    }
+
+
+    /* =========================================================
+       SINGLE RECORD LOOKUPS
+       ========================================================= */
+
+    @GetMapping("/{id}")
+    public ResponseEntity<TrafficRecord> getTrafficRecordById(
+            @PathVariable Long id) {
+
+        return trafficRecordService.getTrafficRecordById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/road/{roadId}/latest")
+    public ResponseEntity<TrafficRecord> getLatestByRoad(
+            @PathVariable Long roadId) {
+
+        return trafficRecordService.getLatestTrafficRecordByRoad(roadId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/location/{locationId}/latest")
+    public ResponseEntity<TrafficRecord> getLatestByLocation(
+            @PathVariable Long locationId) {
+
+        return trafficRecordService.getLatestTrafficRecordByLocation(locationId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/road/{roadId}")
+    public ResponseEntity<List<TrafficRecord>> getByRoad(
+            @PathVariable Long roadId) {
+
+        return ResponseEntity.ok(
+                trafficRecordService.getTrafficRecordsByRoad(roadId)
+        );
+    }
+
+    @GetMapping("/location/{locationId}")
+    public ResponseEntity<List<TrafficRecord>> getByLocation(
+            @PathVariable Long locationId) {
+
+        return ResponseEntity.ok(
+                trafficRecordService.getTrafficRecordsByLocation(locationId)
+        );
+    }
+
+    @GetMapping("/level/{trafficLevel}")
+    public ResponseEntity<List<TrafficRecord>> getByLevel(
+            @PathVariable String trafficLevel) {
+
+        return ResponseEntity.ok(
+                trafficRecordService.getTrafficRecordsByTrafficLevel(trafficLevel)
+        );
+    }
+
+    @GetMapping("/between")
+    public ResponseEntity<List<TrafficRecord>> getBetween(
+            @RequestParam String start,
+            @RequestParam String end) {
+
+        try {
+            LocalDateTime startDt = LocalDateTime.parse(start);
+            LocalDateTime endDt = LocalDateTime.parse(end);
+            return ResponseEntity.ok(
+                    trafficRecordService.getTrafficRecordsBetween(startDt, endDt)
+            );
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+
+    /* =========================================================
+       CRUD
+       ========================================================= */
+
+    @PostMapping
+    public ResponseEntity<TrafficRecord> createTrafficRecord(
+            @RequestBody TrafficRecord record) {
+
+        return ResponseEntity.ok(
+                trafficRecordService.createTrafficRecord(record)
+        );
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<TrafficRecord> updateTrafficRecord(
+            @PathVariable Long id,
+            @RequestBody TrafficRecord record) {
+
+        return ResponseEntity.ok(
+                trafficRecordService.updateTrafficRecord(id, record)
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTrafficRecord(@PathVariable Long id) {
+
+        trafficRecordService.deleteTrafficRecord(id);
+        return ResponseEntity.noContent().build();
+    }
+}

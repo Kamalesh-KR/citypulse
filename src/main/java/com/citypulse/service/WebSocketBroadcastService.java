@@ -3,10 +3,6 @@ package com.citypulse.service;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 @Service
 public class WebSocketBroadcastService {
 
@@ -14,67 +10,59 @@ public class WebSocketBroadcastService {
 
     public WebSocketBroadcastService(
             SimpMessagingTemplate messagingTemplate) {
-
         this.messagingTemplate = messagingTemplate;
     }
 
-    // ============================================
-    // BROADCAST: new traffic record added
-    // ============================================
-    public void broadcastTrafficUpdate(Object trafficPayload) {
 
-        Map<String, Object> envelope = new LinkedHashMap<>();
-        envelope.put("event", "TRAFFIC_UPDATED");
-        envelope.put("timestamp", LocalDateTime.now().toString());
-        envelope.put("payload", trafficPayload);
+    public void broadcastTrafficUpdate(Object trafficPayload) {
 
         messagingTemplate.convertAndSend(
                 "/topic/traffic",
-                (Object) envelope);
+                trafficPayload
+        );
     }
 
-    // ============================================
-    // BROADCAST: new prediction generated
-    // ============================================
-    public void broadcastPredictionUpdate(Object predictionPayload) {
 
-        Map<String, Object> envelope = new LinkedHashMap<>();
-        envelope.put("event", "PREDICTION_UPDATED");
-        envelope.put("timestamp", LocalDateTime.now().toString());
-        envelope.put("payload", predictionPayload);
+    public void broadcastPredictionUpdate(Object predictionPayload) {
 
         messagingTemplate.convertAndSend(
                 "/topic/predictions",
-                (Object) envelope);
+                predictionPayload
+        );
     }
 
-    // ============================================
-    // BROADCAST: new alert created
-    // ============================================
-    public void broadcastAlertUpdate(Object alertPayload) {
 
-        Map<String, Object> envelope = new LinkedHashMap<>();
-        envelope.put("event", "ALERT_CREATED");
-        envelope.put("timestamp", LocalDateTime.now().toString());
-        envelope.put("payload", alertPayload);
+    public void broadcastAlertUpdate(Object alertPayload) {
 
         messagingTemplate.convertAndSend(
                 "/topic/alerts",
-                (Object) envelope);
+                alertPayload
+        );
     }
 
-    // ============================================
-    // BROADCAST: new citizen report submitted
-    // ============================================
-    public void broadcastReportUpdate(Object reportPayload) {
 
-        Map<String, Object> envelope = new LinkedHashMap<>();
-        envelope.put("event", "REPORT_CREATED");
-        envelope.put("timestamp", LocalDateTime.now().toString());
-        envelope.put("payload", reportPayload);
+    public void broadcastReportUpdate(Object reportPayload) {
 
         messagingTemplate.convertAndSend(
                 "/topic/reports",
-                (Object) envelope);
+                reportPayload
+        );
+    }
+
+
+    /**
+     * Broadcasts an emergency dispatch to all connected clients.
+     *
+     * Frontend subscribes to /topic/emergency and displays:
+     *   - Native OS notification
+     *   - Red banner at top of page
+     *   - Entry in live incident board
+     */
+    public void broadcastEmergencyDispatch(Object emergencyPayload) {
+
+        messagingTemplate.convertAndSend(
+                "/topic/emergency",
+                emergencyPayload
+        );
     }
 }

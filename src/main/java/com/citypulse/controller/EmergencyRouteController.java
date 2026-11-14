@@ -5,124 +5,126 @@ import com.citypulse.dto.EmergencySimulationResponse;
 import com.citypulse.model.EmergencyRoute;
 import com.citypulse.service.EmergencyRouteService;
 import com.citypulse.service.EmergencySimulationService;
-import jakarta.validation.Valid;
+import com.citypulse.service.WebSocketBroadcastService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/emergency-routes")
 public class EmergencyRouteController {
 
-    private final EmergencyRouteService emergencyRouteService;
-    private final EmergencySimulationService emergencySimulationService;
+        private final EmergencyRouteService emergencyRouteService;
+        private final WebSocketBroadcastService broadcastService;
+        private final EmergencySimulationService emergencySimulationService;
 
-    public EmergencyRouteController(
-            EmergencyRouteService emergencyRouteService,
-            EmergencySimulationService emergencySimulationService) {
+        public EmergencyRouteController(
+                EmergencyRouteService emergencyRouteService,
+                WebSocketBroadcastService broadcastService,
+                EmergencySimulationService emergencySimulationService) {
 
-        this.emergencyRouteService =
-                emergencyRouteService;
-
-        this.emergencySimulationService =
-                emergencySimulationService;
+                this.emergencyRouteService = emergencyRouteService;
+                this.broadcastService = broadcastService;
+                this.emergencySimulationService = emergencySimulationService;
     }
+
+
+    /* =========================================================
+       QUERY ENDPOINTS
+       ========================================================= */
 
     @GetMapping
     public ResponseEntity<List<EmergencyRoute>> getAllEmergencyRoutes() {
-
         return ResponseEntity.ok(
-                emergencyRouteService
-                        .getAllEmergencyRoutes());
+                emergencyRouteService.getAllEmergencyRoutes()
+        );
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<EmergencyRoute> getEmergencyRouteById(
             @PathVariable Long id) {
 
-        return emergencyRouteService
-                .getEmergencyRouteById(id)
+        return emergencyRouteService.getEmergencyRouteById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/type/{emergencyType}")
-    public ResponseEntity<List<EmergencyRoute>>
-    getRoutesByEmergencyType(
+    public ResponseEntity<List<EmergencyRoute>> getEmergencyRoutesByType(
             @PathVariable String emergencyType) {
 
         return ResponseEntity.ok(
-                emergencyRouteService
-                        .getRoutesByEmergencyType(
-                                emergencyType));
+                emergencyRouteService.getRoutesByEmergencyType(emergencyType)
+        );
     }
 
     @GetMapping("/start/{startLocationId}")
-    public ResponseEntity<List<EmergencyRoute>>
-    getRoutesByStartLocation(
+    public ResponseEntity<List<EmergencyRoute>> getEmergencyRoutesByStart(
             @PathVariable Long startLocationId) {
 
         return ResponseEntity.ok(
-                emergencyRouteService
-                        .getRoutesByStartLocation(
-                                startLocationId));
+                emergencyRouteService.getRoutesByStartLocation(startLocationId)
+        );
     }
 
     @GetMapping("/destination/{destinationLocationId}")
-    public ResponseEntity<List<EmergencyRoute>>
-    getRoutesByDestinationLocation(
+    public ResponseEntity<List<EmergencyRoute>> getEmergencyRoutesByDest(
             @PathVariable Long destinationLocationId) {
 
         return ResponseEntity.ok(
-                emergencyRouteService
-                        .getRoutesByDestinationLocation(
-                                destinationLocationId));
+                emergencyRouteService.getRoutesByDestinationLocation(
+                        destinationLocationId
+                )
+        );
     }
 
     @GetMapping("/priority/{priorityStatus}")
-    public ResponseEntity<List<EmergencyRoute>>
-    getRoutesByPriorityStatus(
+    public ResponseEntity<List<EmergencyRoute>> getEmergencyRoutesByPriority(
             @PathVariable String priorityStatus) {
 
         return ResponseEntity.ok(
-                emergencyRouteService
-                        .getRoutesByPriorityStatus(
-                                priorityStatus));
+                emergencyRouteService.getRoutesByPriorityStatus(priorityStatus)
+        );
     }
 
     @GetMapping("/simulation/{simulationStatus}")
     public ResponseEntity<List<EmergencyRoute>>
-    getRoutesBySimulationStatus(
-            @PathVariable String simulationStatus) {
+            getEmergencyRoutesBySimulationStatus(
+                    @PathVariable String simulationStatus) {
 
         return ResponseEntity.ok(
-                emergencyRouteService
-                        .getRoutesBySimulationStatus(
-                                simulationStatus));
+                emergencyRouteService.getRoutesBySimulationStatus(
+                        simulationStatus
+                )
+        );
     }
 
+
+    /* =========================================================
+       CRUD ENDPOINTS
+       ========================================================= */
+
     @PostMapping
-    public ResponseEntity<EmergencyRoute>
-    createEmergencyRoute(
-            @RequestBody EmergencyRoute emergencyRoute) {
+    public ResponseEntity<EmergencyRoute> createEmergencyRoute(
+            @RequestBody EmergencyRoute route) {
 
         return ResponseEntity.ok(
-                emergencyRouteService
-                        .createEmergencyRoute(
-                                emergencyRoute));
+                emergencyRouteService.createEmergencyRoute(route)
+        );
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<EmergencyRoute>
-    updateEmergencyRoute(
+    public ResponseEntity<EmergencyRoute> updateEmergencyRoute(
             @PathVariable Long id,
-            @RequestBody EmergencyRoute emergencyRoute) {
+            @RequestBody EmergencyRoute route) {
 
         return ResponseEntity.ok(
-                emergencyRouteService.updateEmergencyRoute(
-                        id,
-                        emergencyRoute));
+                emergencyRouteService.updateEmergencyRoute(id, route)
+        );
     }
 
     @DeleteMapping("/{id}")
@@ -130,17 +132,113 @@ public class EmergencyRouteController {
             @PathVariable Long id) {
 
         emergencyRouteService.deleteEmergencyRoute(id);
-
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/simulate")
-    public ResponseEntity<EmergencySimulationResponse>
-    simulateEmergencyRoute(
-            @Valid @RequestBody EmergencySimulationRequest request) {
 
-        EmergencySimulationResponse response =
-                emergencySimulationService.simulate(request);
+    /* =========================================================
+       EMERGENCY SIMULATION (D1)
+       ========================================================= */
+
+    /**
+     * Simulates an emergency route: computes distance, normal travel time,
+     * and emergency travel time (with priority speed-up).
+     *
+     * POST /api/emergency-routes/simulate
+     * {
+     *   "emergencyType": "AMBULANCE",
+     *   "startLocationId": 1,
+     *   "destinationLocationId": 2
+     * }
+     */
+    @PostMapping("/simulate")
+    public ResponseEntity<EmergencySimulationResponse> simulate(
+            @RequestBody EmergencySimulationRequest request) {
+
+        return ResponseEntity.ok(
+                emergencySimulationService.simulate(request));
+    }
+
+
+    /* =========================================================
+       EMERGENCY BROADCAST (NEW — D1)
+       ========================================================= */
+
+    /**
+     * Manually broadcast an emergency dispatch to all connected users.
+     *
+     * Example request:
+     * POST /api/emergency-routes/broadcast
+     * {
+     *   "emergencyType": "AMBULANCE",
+     *   "startLocationName": "MG Road",
+     *   "destinationName": "Brigade Road",
+     *   "estimatedMinutes": 8.5,
+     *   "priorityStatus": "HIGH"
+     * }
+     *
+     * The endpoint publishes the payload to /topic/emergency.
+     * Every browser subscribed to that topic will:
+     *   - Show a native OS notification
+     *   - Display a red banner at the top of the page
+     *   - Log the event to the live incident board
+     */
+    @PostMapping("/broadcast")
+    public ResponseEntity<Map<String, Object>> broadcastEmergency(
+            @RequestBody Map<String, Object> body) {
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+
+        String emergencyType =
+                body.get("emergencyType") != null
+                        ? String.valueOf(body.get("emergencyType"))
+                        : "AMBULANCE";
+
+        String startLocationName =
+                body.get("startLocationName") != null
+                        ? String.valueOf(body.get("startLocationName"))
+                        : "Unknown";
+
+        String destinationName =
+                body.get("destinationName") != null
+                        ? String.valueOf(body.get("destinationName"))
+                        : "Unknown";
+
+        Object estimatedMinutes =
+                body.get("estimatedMinutes") != null
+                        ? body.get("estimatedMinutes")
+                        : null;
+
+        String priorityStatus =
+                body.get("priorityStatus") != null
+                        ? String.valueOf(body.get("priorityStatus"))
+                        : "HIGH";
+
+        payload.put("emergencyType", emergencyType);
+        payload.put("startLocationName", startLocationName);
+        payload.put("destinationName", destinationName);
+        payload.put("estimatedMinutes", estimatedMinutes);
+        payload.put("priorityStatus", priorityStatus);
+        payload.put("dispatchedAt", ZonedDateTime.now().toString());
+
+        String message = String.format(
+                "%s dispatched from %s → %s%s",
+                emergencyType,
+                startLocationName,
+                destinationName,
+                estimatedMinutes != null
+                        ? " (ETA " + estimatedMinutes + " min)"
+                        : ""
+        );
+
+        payload.put("message", message);
+
+        broadcastService.broadcastEmergencyDispatch(payload);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("broadcast", true);
+        response.put("topic", "/topic/emergency");
+        response.put("payload", payload);
 
         return ResponseEntity.ok(response);
     }

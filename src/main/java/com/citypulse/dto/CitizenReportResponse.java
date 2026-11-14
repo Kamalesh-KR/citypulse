@@ -7,7 +7,9 @@ public class CitizenReportResponse {
     private Long id;
     private Long userId;
     private Long roadId;
+    private String roadName;
     private Long locationId;
+    private String locationName;
     private String reportType;
     private String description;
     private Double latitude;
@@ -23,7 +25,9 @@ public class CitizenReportResponse {
             Long id,
             Long userId,
             Long roadId,
+            String roadName,
             Long locationId,
+            String locationName,
             String reportType,
             String description,
             Double latitude,
@@ -35,7 +39,9 @@ public class CitizenReportResponse {
         this.id = id;
         this.userId = userId;
         this.roadId = roadId;
+        this.roadName = roadName;
         this.locationId = locationId;
+        this.locationName = locationName;
         this.reportType = reportType;
         this.description = description;
         this.latitude = latitude;
@@ -69,12 +75,28 @@ public class CitizenReportResponse {
         this.roadId = roadId;
     }
 
+    public String getRoadName() {
+        return roadName;
+    }
+
+    public void setRoadName(String roadName) {
+        this.roadName = roadName;
+    }
+
     public Long getLocationId() {
         return locationId;
     }
 
     public void setLocationId(Long locationId) {
         this.locationId = locationId;
+    }
+
+    public String getLocationName() {
+        return locationName;
+    }
+
+    public void setLocationName(String locationName) {
+        this.locationName = locationName;
     }
 
     public String getReportType() {

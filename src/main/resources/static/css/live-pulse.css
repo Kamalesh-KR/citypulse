@@ -1,0 +1,299 @@
+/* ============================================================
+   CityPulse — Live Traffic Pulse Widget
+   ============================================================ */
+
+.live-pulse-widget {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 24px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-radius: 12px;
+    border: 1px solid #1e293b;
+    border-left: 4px solid #0ea5e9;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.live-pulse-widget::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        #0ea5e9 50%,
+        transparent 100%);
+    animation: livePulseSweep 3s linear infinite;
+}
+
+@keyframes livePulseSweep {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.live-pulse-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.live-pulse-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #f1f5f9;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.live-pulse-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(14, 165, 233, 0.1);
+}
+
+.live-pulse-status-label.live {
+    color: #22c55e;
+}
+
+.live-pulse-status-label.offline {
+    color: #f59e0b;
+}
+
+.live-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.live-pulse-dot.live {
+    background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    animation: livePulseDot 1.8s ease-out infinite;
+}
+
+.live-pulse-dot.offline {
+    background: #f59e0b;
+}
+
+@keyframes livePulseDot {
+    0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+    100% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+}
+
+.live-pulse-main {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 8px 0;
+}
+
+.live-pulse-vehicle-count {
+    color: #f1f5f9;
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.2s;
+}
+
+.live-pulse-unit {
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.live-pulse-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid #1e293b;
+}
+
+.live-pulse-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.live-pulse-meta-label {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.live-pulse-meta-value {
+    color: #f1f5f9;
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.live-pulse-change.rising {
+    color: #22c55e;
+}
+
+.live-pulse-change.falling {
+    color: #ef4444;
+}
+
+.live-pulse-change.stable {
+    color: #64748b;
+}
+
+@media (max-width: 640px) {
+    .live-pulse-vehicle-count {
+        font-size: 32px;
+    }
+    .live-pulse-widget {
+        padding: 16px;
+    }
+}
+
+
+/* ============================================
+   PER-ROAD LIVE PULSE ROWS
+   ============================================ */
+
+.road-pulse-roads {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.road-pulse-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 70px 70px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.road-pulse-row:hover {
+    background: rgba(30, 41, 59, 0.9);
+}
+
+.road-pulse-name {
+    color: #e2e8f0;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.road-pulse-bar {
+    height: 8px;
+    background: #0f172a;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.road-pulse-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s linear, background 0.3s;
+}
+
+.road-pulse-bar-fill.level-low {
+    background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+
+.road-pulse-bar-fill.level-moderate {
+    background: linear-gradient(90deg, #ca8a04, #eab308);
+}
+
+.road-pulse-bar-fill.level-high {
+    background: linear-gradient(90deg, #ea580c, #f97316);
+}
+
+.road-pulse-bar-fill.level-severe {
+    background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+
+.road-pulse-bar-fill.level-unknown {
+    background: #475569;
+}
+
+.road-pulse-count {
+    color: #f1f5f9;
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.road-pulse-level {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+    padding: 3px 6px;
+    border-radius: 4px;
+}
+
+.road-pulse-level.level-low {
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+}
+
+.road-pulse-level.level-moderate {
+    color: #eab308;
+    background: rgba(234, 179, 8, 0.1);
+}
+
+.road-pulse-level.level-high {
+    color: #f97316;
+    background: rgba(249, 115, 22, 0.1);
+}
+
+.road-pulse-level.level-severe {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.road-pulse-level.level-unknown {
+    color: #64748b;
+    background: rgba(100, 116, 139, 0.1);
+}
+
+.road-pulse-empty {
+    padding: 24px;
+    text-align: center;
+    color: #64748b;
+    font-size: 13px;
+}
+
+@media (max-width: 640px) {
+    .road-pulse-row {
+        grid-template-columns: 100px 1fr 60px;
+        gap: 8px;
+    }
+    .road-pulse-level {
+        display: none;
+    }
+}

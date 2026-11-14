@@ -4,6 +4,7 @@ import com.citypulse.model.CitizenReport;
 import com.citypulse.repository.CitizenReportRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -82,6 +83,52 @@ public class CitizenReportService {
                     if (updatedReport.getReviewedAt() != null) {
                         existingReport.setReviewedAt(
                                 updatedReport.getReviewedAt());
+                    }
+
+                    return citizenReportRepository.save(existingReport);
+                })
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Citizen report not found with id: " + id));
+    }
+
+    /**
+     * Updates only the status of an existing report.
+     *
+     * Valid statuses: PENDING, APPROVED, REJECTED, RESOLVED.
+     * Stamps reviewedAt when the status moves away from PENDING.
+     */
+    public CitizenReport updateStatus(Long id, String newStatus) {
+
+        if (newStatus == null || newStatus.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Status is required.");
+        }
+
+        String normalised =
+                newStatus.trim().toUpperCase();
+
+        switch (normalised) {
+            case "PENDING":
+            case "APPROVED":
+            case "REJECTED":
+            case "RESOLVED":
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Invalid status: " + newStatus
+                                + ". Allowed: PENDING, APPROVED, REJECTED, RESOLVED.");
+        }
+
+        return citizenReportRepository.findById(id)
+                .map(existingReport -> {
+
+                    existingReport.setStatus(normalised);
+
+                    if (!"PENDING".equals(normalised)) {
+                        existingReport.setReviewedAt(LocalDateTime.now());
+                    } else {
+                        existingReport.setReviewedAt(null);
                     }
 
                     return citizenReportRepository.save(existingReport);

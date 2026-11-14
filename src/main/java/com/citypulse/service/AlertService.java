@@ -7,6 +7,7 @@ import com.citypulse.repository.TrafficRecordRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -292,6 +293,100 @@ public class AlertService {
                 congestionAlert,
                 anomalyAlert
         );
+    }
+
+    /**
+     * NEW (Fix #2): Generates smart alerts for EVERY road
+     * that currently has HIGH or SEVERE traffic.
+     *
+     * This is the endpoint that makes Test 7 pass — it
+     * populates alerts for all roads, not just MG Road.
+     *
+     * Behaviour:
+     *   - Finds latest traffic record for each distinct road
+     *   - Filters to those with trafficLevel = HIGH or SEVERE
+     *   - Creates a congestion alert per matching road
+     *   - Skips roads that already have an ACTIVE congestion
+     *     alert in the last 30 minutes (avoid duplication)
+     *
+     * Returns the list of newly created alerts.
+     */
+    public List<Alert> generateAllSmartAlerts() {
+
+        List<Alert> createdAlerts =
+                new ArrayList<>();
+
+        // Find latest traffic record for every road
+        // by querying records ordered by recordedAt DESC
+        List<Long> distinctRoadIds =
+                trafficRecordRepository
+                        .findDistinctRoadIdsWithTraffic();
+
+        for (Long roadId : distinctRoadIds) {
+
+            try {
+
+                Optional<TrafficRecord> latestOpt =
+                        trafficRecordRepository
+                                .findFirstByRoadIdOrderByRecordedAtDesc(roadId);
+
+                if (latestOpt.isEmpty()) {
+                    continue;
+                }
+
+                TrafficRecord latest = latestOpt.get();
+
+                String level =
+                        latest.getTrafficLevel();
+
+                if (level == null) {
+                    continue;
+                }
+
+                String normalised =
+                        level.trim().toUpperCase();
+
+                // Only generate alerts for HIGH or SEVERE
+                if (!normalised.equals("HIGH")
+                        && !normalised.equals("SEVERE")) {
+                    continue;
+                }
+
+                // Skip if an active CONGESTION alert for this road
+                // was created within the last 30 minutes
+                boolean recentAlertExists =
+                        alertRepository.findByRoadId(roadId)
+                                .stream()
+                                .anyMatch(existing ->
+                                        "CONGESTION".equalsIgnoreCase(
+                                                existing.getAlertType())
+                                                && Boolean.TRUE.equals(
+                                                        existing.getActive())
+                                                && existing.getCreatedAt() != null
+                                                && existing.getCreatedAt()
+                                                        .isAfter(
+                                                                LocalDateTime.now()
+                                                                        .minusMinutes(30)));
+
+                if (recentAlertExists) {
+                    continue;
+                }
+
+                Alert alert =
+                        generateCongestionAlert(roadId);
+
+                if (alert != null) {
+                    createdAlerts.add(alert);
+                }
+
+            } catch (RuntimeException roadFailure) {
+
+                // Skip this road, continue with the rest
+                // (one bad road must not break the batch)
+            }
+        }
+
+        return createdAlerts;
     }
 
     // =========================================================

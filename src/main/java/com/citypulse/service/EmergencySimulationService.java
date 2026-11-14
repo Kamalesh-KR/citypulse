@@ -15,6 +15,18 @@ import java.util.Map;
 @Service
 public class EmergencySimulationService {
 
+    /**
+     * Straight-line distance is multiplied by this factor to approximate
+     * real road distance. 1.3 is a common average for urban road networks.
+     */
+    private static final double ROAD_DISTANCE_FACTOR = 1.3;
+
+    /**
+     * Average urban driving speed used for the Haversine fallback ETA.
+     * 40 km/h is a reasonable assumption for a mixed-speed city trip.
+     */
+    private static final double FALLBACK_AVERAGE_SPEED_KMH = 40.0;
+
     private final LocationRepository locationRepository;
     private final TrafficRecordRepository trafficRecordRepository;
     private final GraphHopperRoutingService graphHopperRoutingService;
@@ -58,21 +70,9 @@ public class EmergencySimulationService {
                     "Start and destination locations must be different.");
         }
 
-        Map<?, ?> routeResponse =
-                graphHopperRoutingService.calculateRoute(
-                        startLocation.getLatitude().doubleValue(),
-                        startLocation.getLongitude().doubleValue(),
-                        destinationLocation.getLatitude().doubleValue(),
-                        destinationLocation.getLongitude().doubleValue());
-
-        Map<?, ?> path =
-                extractFirstPath(routeResponse);
-
-        double distanceKm =
-                extractDouble(path.get("distance")) / 1000.0;
-
-        double normalTravelTimeMinutes =
-                extractDouble(path.get("time")) / 60000.0;
+        RouteEstimate route = resolveRoute(
+                startLocation,
+                destinationLocation);
 
         TrafficAnalysis trafficAnalysis =
                 analyzeTraffic(
@@ -81,7 +81,7 @@ public class EmergencySimulationService {
 
         double emergencyTravelTimeMinutes =
                 calculateEmergencyTravelTime(
-                        normalTravelTimeMinutes,
+                        route.normalTravelTimeMinutes(),
                         trafficAnalysis.trafficLevel());
 
         EmergencySimulationResponse response =
@@ -104,10 +104,10 @@ public class EmergencySimulationService {
                 destinationLocation.getName());
 
         response.setRouteDistanceKm(
-                round(distanceKm));
+                round(route.distanceKm()));
 
         response.setNormalTravelTimeMinutes(
-                round(normalTravelTimeMinutes));
+                round(route.normalTravelTimeMinutes()));
 
         response.setEmergencyTravelTimeMinutes(
                 round(emergencyTravelTimeMinutes));
@@ -129,11 +129,106 @@ public class EmergencySimulationService {
 
         response.setMessage(
                 "Emergency route simulation completed using "
-                        + "the local OSM road network. Signal priority "
-                        + "is simulated and does not control real traffic signals.");
+                        + route.sourceDescription()
+                        + ". Signal priority is simulated and does not control "
+                        + "real traffic signals.");
 
         return response;
     }
+
+    /* =========================================================
+       ROUTE RESOLUTION — OSRM with Haversine fallback
+       ========================================================= */
+
+    private RouteEstimate resolveRoute(
+            Location startLocation,
+            Location destinationLocation) {
+
+        try {
+
+            Map<?, ?> routeResponse =
+                    graphHopperRoutingService.calculateRoute(
+                            startLocation.getLatitude().doubleValue(),
+                            startLocation.getLongitude().doubleValue(),
+                            destinationLocation.getLatitude().doubleValue(),
+                            destinationLocation.getLongitude().doubleValue());
+
+            Map<?, ?> path =
+                    extractFirstPath(routeResponse);
+
+            double distanceKm =
+                    extractDouble(path.get("distance")) / 1000.0;
+
+            double normalTravelTimeMinutes =
+                    extractDouble(path.get("time")) / 60000.0;
+
+            return new RouteEstimate(
+                    distanceKm,
+                    normalTravelTimeMinutes,
+                    "the local OSM road network");
+
+        } catch (RuntimeException routingFailure) {
+
+            // OSRM/GraphHopper unavailable — fall back to Haversine
+            double straightLineKm =
+                    haversineKm(
+                            startLocation.getLatitude().doubleValue(),
+                            startLocation.getLongitude().doubleValue(),
+                            destinationLocation.getLatitude().doubleValue(),
+                            destinationLocation.getLongitude().doubleValue());
+
+            double roadDistanceKm =
+                    straightLineKm * ROAD_DISTANCE_FACTOR;
+
+            double travelTimeMinutes =
+                    (roadDistanceKm / FALLBACK_AVERAGE_SPEED_KMH) * 60.0;
+
+            // Guard against zero/degenerate results
+            if (roadDistanceKm <= 0.05) {
+                roadDistanceKm = 0.05;
+            }
+            if (travelTimeMinutes < 0.5) {
+                travelTimeMinutes = 0.5;
+            }
+
+            return new RouteEstimate(
+                    roadDistanceKm,
+                    travelTimeMinutes,
+                    "a straight-line distance estimate (routing server "
+                            + "unavailable)");
+        }
+    }
+
+    /**
+     * Great-circle distance between two lat/lon points, in kilometres.
+     */
+    private double haversineKm(
+            double lat1,
+            double lon1,
+            double lat2,
+            double lon2) {
+
+        final double EARTH_RADIUS_KM = 6371.0;
+
+        double lat1Rad = Math.toRadians(lat1);
+        double lat2Rad = Math.toRadians(lat2);
+
+        double deltaLat = Math.toRadians(lat2 - lat1);
+        double deltaLon = Math.toRadians(lon2 - lon1);
+
+        double a =
+                Math.sin(deltaLat / 2.0) * Math.sin(deltaLat / 2.0)
+                        + Math.cos(lat1Rad) * Math.cos(lat2Rad)
+                        * Math.sin(deltaLon / 2.0) * Math.sin(deltaLon / 2.0);
+
+        double c = 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
+
+        return EARTH_RADIUS_KM * c;
+    }
+
+    /* =========================================================
+       TRAFFIC ANALYSIS (unchanged)
+       ========================================================= */
 
     private TrafficAnalysis analyzeTraffic(
             Location startLocation,
@@ -251,6 +346,10 @@ public class EmergencySimulationService {
         return Math.max(simulatedTime, 0.1);
     }
 
+    /* =========================================================
+       GraphHopper / OSRM response parsing (unchanged)
+       ========================================================= */
+
     private Map<?, ?> extractFirstPath(
             Map<?, ?> routeResponse) {
 
@@ -303,6 +402,10 @@ public class EmergencySimulationService {
                 "GraphHopper response is missing a required numeric value.");
     }
 
+    /* =========================================================
+       VALIDATION + UTILITIES (unchanged)
+       ========================================================= */
+
     private void validateCoordinates(
             Location location,
             String locationLabel) {
@@ -336,8 +439,18 @@ public class EmergencySimulationService {
         return Math.round(value * 100.0) / 100.0;
     }
 
+    /* =========================================================
+       INTERNAL VALUE TYPES
+       ========================================================= */
+
     private record TrafficAnalysis(
             String trafficLevel,
             Double congestionScore) {
+    }
+
+    private record RouteEstimate(
+            double distanceKm,
+            double normalTravelTimeMinutes,
+            String sourceDescription) {
     }
 }

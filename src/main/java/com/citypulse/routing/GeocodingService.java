@@ -1,25 +1,37 @@
 package com.citypulse.routing;
 
 import com.citypulse.dto.AddressLocationResponse;
+import com.citypulse.model.Location;
+import com.citypulse.repository.LocationRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class GeocodingService {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(GeocodingService.class);
+
     private final RestClient restClient;
+    private final LocationRepository locationRepository;
 
     public GeocodingService(
             @Value("${citypulse.geocoding.photon-url:http://localhost:2322}")
-            String photonUrl) {
+            String photonUrl,
+            LocationRepository locationRepository) {
 
         this.restClient = RestClient.builder()
                 .baseUrl(photonUrl)
                 .build();
+
+        this.locationRepository = locationRepository;
     }
 
     public AddressLocationResponse geocode(String address) {
@@ -29,11 +41,194 @@ public class GeocodingService {
                     "Address is required.");
         }
 
+        String trimmedAddress = address.trim();
+
+        /* =========================================================
+           1. DB-FIRST lookup — match against locations table
+           ========================================================= */
+
+        Optional<AddressLocationResponse> dbMatch =
+                lookupInDatabase(trimmedAddress);
+
+        if (dbMatch.isPresent()) {
+            return dbMatch.get();
+        }
+
+        /* =========================================================
+           2. Photon geocoding (for addresses not in the DB)
+           ========================================================= */
+
+        try {
+
+            return geocodeWithPhoton(trimmedAddress);
+
+        } catch (RuntimeException photonFailure) {
+
+            log.warn(
+                    "Photon geocoding unavailable ({}); will try "
+                            + "fuzzy DB match for: {}",
+                    photonFailure.getMessage(),
+                    trimmedAddress);
+
+            /* =====================================================
+               3. Fuzzy DB fallback — last resort before failing
+               ===================================================== */
+
+            Optional<AddressLocationResponse> fuzzyMatch =
+                    fuzzyDatabaseMatch(trimmedAddress);
+
+            if (fuzzyMatch.isPresent()) {
+                return fuzzyMatch.get();
+            }
+
+            throw new IllegalArgumentException(
+                    "Address could not be found: "
+                            + trimmedAddress
+                            + " (geocoding service unavailable "
+                            + "and no matching location in database)");
+        }
+    }
+
+    /* =========================================================
+       DB LOOKUP HELPERS
+       ========================================================= */
+
+    /**
+     * Exact (case-insensitive) name match against the locations table.
+     * This is the fast path for all 44 CityPulse dropdown locations.
+     */
+    private Optional<AddressLocationResponse> lookupInDatabase(
+            String address) {
+
+        try {
+
+            List<Location> allLocations =
+                    locationRepository.findAll();
+
+            if (allLocations == null || allLocations.isEmpty()) {
+                return Optional.empty();
+            }
+
+            // Pass 1: exact case-insensitive name match
+            for (Location location : allLocations) {
+
+                if (location.getName() == null
+                        || location.getLatitude() == null
+                        || location.getLongitude() == null) {
+                    continue;
+                }
+
+                if (location.getName()
+                        .trim()
+                        .equalsIgnoreCase(address)) {
+
+                    return Optional.of(
+                            toResponse(location));
+                }
+            }
+
+            // Pass 2: address contains location name (e.g. "MG Road, Bangalore")
+            for (Location location : allLocations) {
+
+                if (location.getName() == null
+                        || location.getLatitude() == null
+                        || location.getLongitude() == null) {
+                    continue;
+                }
+
+                String name = location.getName().trim();
+
+                if (name.length() >= 4
+                        && address.toLowerCase().contains(
+                                name.toLowerCase())) {
+
+                    return Optional.of(
+                            toResponse(location));
+                }
+            }
+
+            return Optional.empty();
+
+        } catch (RuntimeException dbFailure) {
+
+            log.warn(
+                    "DB location lookup failed: {}",
+                    dbFailure.getMessage());
+
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Very loose last-resort match when both Photon and exact DB
+     * lookup fail. Matches on individual words.
+     */
+    private Optional<AddressLocationResponse> fuzzyDatabaseMatch(
+            String address) {
+
+        try {
+
+            List<Location> allLocations =
+                    locationRepository.findAll();
+
+            if (allLocations == null || allLocations.isEmpty()) {
+                return Optional.empty();
+            }
+
+            String[] words =
+                    address.toLowerCase().split("\\s+");
+
+            for (Location location : allLocations) {
+
+                if (location.getName() == null
+                        || location.getLatitude() == null
+                        || location.getLongitude() == null) {
+                    continue;
+                }
+
+                String name =
+                        location.getName().toLowerCase();
+
+                for (String word : words) {
+
+                    if (word.length() >= 4
+                            && name.contains(word)) {
+
+                        return Optional.of(
+                                toResponse(location));
+                    }
+                }
+            }
+
+            return Optional.empty();
+
+        } catch (RuntimeException dbFailure) {
+
+            return Optional.empty();
+        }
+    }
+
+    private AddressLocationResponse toResponse(
+            Location location) {
+
+        return new AddressLocationResponse(
+                location.getName(),
+                location.getLatitude().doubleValue(),
+                location.getLongitude().doubleValue());
+    }
+
+    /* =========================================================
+       PHOTON GEOCODING (unchanged behavior)
+       ========================================================= */
+
+    private AddressLocationResponse geocodeWithPhoton(
+            String address) {
+
         Map<?, ?> response = restClient
                 .get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api")
-                        .queryParam("q", address.trim())
+                        .queryParam("q", address)
                         .queryParam("limit", 1)
                         .build())
                 .retrieve()
@@ -85,12 +280,9 @@ public class GeocodingService {
 
         /*
          * GeoJSON coordinates are returned as:
-         *
-         * [longitude, latitude]
-         *
+         *   [longitude, latitude]
          * CityPulse stores them as:
-         *
-         * latitude, longitude
+         *   latitude, longitude
          */
 
         Double longitude =
@@ -107,7 +299,7 @@ public class GeocodingService {
 
         String resolvedAddress =
                 buildResolvedAddress(
-                        address.trim(),
+                        address,
                         firstFeature);
 
         return new AddressLocationResponse(

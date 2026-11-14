@@ -9,44 +9,32 @@
 const CityPulseApp = {
 
     roads: [],
-
     locations: [],
-
     trafficRecords: [],
-
     predictions: [],
-
     routeResults: [],
-
     citizenReports: [],
-
     countries: [],
-
     filteredCountries: [],
-
-    currentUserId: 1,
-
+    currentUserId: null,
     currentSection: "dashboard",
-
     apiBaseUrl: "",
-
     trafficMap: null,
-
     trafficMarkers: [],
-
     globalMap: null,
-
     globalCountryMarker: null,
-
     globalCountryCircle: null,
-
     globalSelectedCountryCode: null,
-
     globalCityMarkers: [],
-
     globalClockTimer: null,
-
     currentLanguage: "en",
+    authToken: null,
+    currentUser: null,
+    emergencyBannerTimer: null,
+    trafficTrendChart: null,
+    trendChartRoadId: null,
+    selectedCity: null,
+    favoriteRoadIds: new Set(),
 
 
     init() {
@@ -54,26 +42,29 @@ const CityPulseApp = {
         console.log("CityPulse frontend initializing...");
 
         this.setupNavigation();
-
         this.setupRouteControls();
-
         this.setupEmergencyControls();
-
         this.setupAlertControls();
-
         this.setupAnalyticsControls();
-
         this.setupPredictionControls();
-
         this.setupCitizenReportControls();
-
         this.setupCityPulseAiControls();
-
         this.setupGlobalWorldMapControls();
-
         this.setupLanguageControls();
+        this.setupAuthControls();
+        this.setupTrendChartControls();
+        this.setupCityFilter();
+
+        const restored = this.tryRestoreAuthFromStorage();
+        this.updateNotificationButtonState();
 
         this.loadDashboard();
+
+        if (!restored) {
+            this.showLoginModal();
+        } else {
+            this.hideAuthModals();
+        }
 
         console.log("CityPulse frontend initialized.");
 
@@ -82,37 +73,23 @@ const CityPulseApp = {
 
     setupNavigation() {
 
-        const navigationItems =
-            document.querySelectorAll(".nav-item");
+        const navigationItems = document.querySelectorAll(".nav-item");
 
         navigationItems.forEach(item => {
-
             item.addEventListener("click", event => {
-
                 event.preventDefault();
-
                 const section = item.dataset.section;
-
                 if (section) this.showSection(section);
-
             });
-
         });
 
-
-        const sectionButtons =
-            document.querySelectorAll("[data-section-target]");
+        const sectionButtons = document.querySelectorAll("[data-section-target]");
 
         sectionButtons.forEach(button => {
-
             button.addEventListener("click", () => {
-
                 const section = button.dataset.sectionTarget;
-
                 if (section) this.showSection(section);
-
             });
-
         });
 
     },
@@ -120,53 +97,46 @@ const CityPulseApp = {
 
     showSection(sectionName) {
 
-        const sections =
-            document.querySelectorAll(".page-section");
+        const sections = document.querySelectorAll(".page-section");
 
         sections.forEach(section => {
             section.classList.remove("active-section");
         });
 
-
-        const navigationItems =
-            document.querySelectorAll(".nav-item");
+        const navigationItems = document.querySelectorAll(".nav-item");
 
         navigationItems.forEach(item => {
             item.classList.remove("active");
         });
 
-
-        const targetSection =
-            document.getElementById(`${sectionName}-section`);
+        const targetSection = document.getElementById(`${sectionName}-section`);
 
         if (!targetSection) {
             console.warn(`Section not found: ${sectionName}`);
             return;
         }
 
-
         targetSection.classList.add("active-section");
 
-
-        const activeNavigationItem =
-            document.querySelector(
-                `.nav-item[data-section="${sectionName}"]`
-            );
+        const activeNavigationItem = document.querySelector(
+            `.nav-item[data-section="${sectionName}"]`
+        );
 
         if (activeNavigationItem) {
             activeNavigationItem.classList.add("active");
         }
 
-
         this.currentSection = sectionName;
 
         this.updatePageHeader(sectionName);
 
-
         if (sectionName === "traffic") this.loadLiveTrafficPage();
         if (sectionName === "emergency") this.loadEmergencyPage();
         if (sectionName === "alerts") this.loadAlertsPage();
-        if (sectionName === "analytics") this.loadAnalyticsPage();
+        if (sectionName === "analytics") {
+            this.loadAnalyticsPage();
+            this.loadTrendChartPage();
+        }
         if (sectionName === "prediction") this.loadPredictionPage();
         if (sectionName === "routes") this.loadSmartRoutesPage();
         if (sectionName === "reports") this.loadCitizenReportsPage();
@@ -178,74 +148,57 @@ const CityPulseApp = {
 
     updatePageHeader(sectionName) {
 
-        const pageTitle =
-            document.getElementById("page-title");
-
-        const pageSubtitle =
-            document.getElementById("page-subtitle");
-
+        const pageTitle = document.getElementById("page-title");
+        const pageSubtitle = document.getElementById("page-subtitle");
 
         const pageInformation = {
-
             dashboard: {
                 title: "Traffic Intelligence Dashboard",
                 subtitle: "Real-time urban mobility overview"
             },
-
             traffic: {
                 title: "Live Traffic",
                 subtitle: "Real-time traffic conditions across monitored roads"
             },
-
             prediction: {
                 title: "Traffic Prediction",
                 subtitle: "Future congestion intelligence"
             },
-
             routes: {
                 title: "Smart Routes",
                 subtitle: "Traffic-aware route analysis"
             },
-
             emergency: {
                 title: "Emergency Mode",
                 subtitle: "Emergency route simulation"
             },
-
             alerts: {
                 title: "Smart Alerts",
                 subtitle: "Intelligent traffic and anomaly alerts"
             },
-
             analytics: {
                 title: "Traffic Analytics",
                 subtitle: "Historical traffic intelligence"
             },
-
             reports: {
                 title: "Citizen Traffic Reports",
                 subtitle: "Community-powered traffic information"
             },
-
             assistant: {
                 title: "CityPulse AI",
                 subtitle: "Traffic intelligence assistant"
             },
-
             global: {
                 title: "Global World Map",
                 subtitle: "Explore CityPulse coverage across the world"
             }
-
         };
-
 
         const information = pageInformation[sectionName];
 
         if (!information) return;
 
         if (pageTitle) pageTitle.textContent = information.title;
-
         if (pageSubtitle) pageSubtitle.textContent = information.subtitle;
 
     },
@@ -255,75 +208,44 @@ const CityPulseApp = {
 
         const url = `${this.apiBaseUrl}${endpoint}`;
 
-        const basicCredentials =
-            btoa("kamalesh@gmail.com:Kamalesh@123");
-
+        const authHeader = this.authToken
+            ? `Bearer ${this.authToken}`
+            : null;
 
         const requestOptions = {
-
             method: options.method || "GET",
-
             headers: {
-
                 "Content-Type": "application/json",
-
-                "Authorization": `Basic ${basicCredentials}`,
-
+                ...(authHeader ? { "Authorization": authHeader } : {}),
                 ...(options.headers || {})
-
             },
-
             credentials: options.credentials || "same-origin"
-
         };
 
-
         if (options.body !== undefined) {
-
             requestOptions.body = JSON.stringify(options.body);
-
         }
-
 
         try {
 
             const response = await fetch(url, requestOptions);
 
-
             if (!response.ok) {
-
                 const errorText = await response.text();
-
-                throw new Error(
-                    `API ${response.status}: ${errorText}`
-                );
-
+                throw new Error(`API ${response.status}: ${errorText}`);
             }
 
+            const contentType = response.headers.get("content-type");
 
-            const contentType =
-                response.headers.get("content-type");
-
-
-            if (
-                contentType &&
-                contentType.includes("application/json")
-            ) {
-
+            if (contentType && contentType.includes("application/json")) {
                 return await response.json();
-
             }
-
 
             return await response.text();
 
         } catch (error) {
 
-            console.error(
-                `API request failed: ${endpoint}`,
-                error
-            );
-
+            console.error(`API request failed: ${endpoint}`, error);
             throw error;
 
         }
@@ -331,32 +253,220 @@ const CityPulseApp = {
     },
 
 
+    isNotificationSupported() {
+        return typeof Notification !== "undefined";
+    },
+
+
+    updateNotificationButtonState() {
+
+        const icon = document.getElementById("notification-icon");
+        const label = document.getElementById("notification-label");
+        const button = document.getElementById("enable-notifications-button");
+
+        if (!icon || !label || !button) return;
+
+        if (!this.isNotificationSupported()) {
+            icon.textContent = "🔕";
+            label.textContent = "Not Supported";
+            button.style.opacity = "0.5";
+            button.disabled = true;
+            return;
+        }
+
+        const permission = Notification.permission;
+
+        if (permission === "granted") {
+            icon.textContent = "🔔";
+            label.textContent = "Notifications On";
+            button.style.background = "#0ea5e9";
+            button.disabled = false;
+        } else if (permission === "denied") {
+            icon.textContent = "🔕";
+            label.textContent = "Blocked";
+            button.style.background = "#dc2626";
+            button.disabled = false;
+        } else {
+            icon.textContent = "🔔";
+            label.textContent = "Notifications";
+            button.style.background = "#334155";
+            button.disabled = false;
+        }
+
+    },
+
+
+    async enableNotifications() {
+
+        if (!this.isNotificationSupported()) {
+            alert("Your browser does not support notifications.");
+            return;
+        }
+
+        if (Notification.permission === "granted") {
+            this.showNotification(
+                "CityPulse",
+                "Notifications are already enabled.",
+                "🔔"
+            );
+            return;
+        }
+
+        if (Notification.permission === "denied") {
+            alert(
+                "Notifications are blocked. " +
+                "Please enable them in your browser settings " +
+                "(click the lock icon in the address bar)."
+            );
+            return;
+        }
+
+        try {
+
+            const permission = await Notification.requestPermission();
+            this.updateNotificationButtonState();
+
+            if (permission === "granted") {
+                this.showNotification(
+                    "CityPulse",
+                    "Notifications enabled! You'll receive traffic alerts.",
+                    "🔔"
+                );
+            }
+
+        } catch (error) {
+            console.error("Notification permission failed:", error);
+        }
+
+    },
+
+
+    showNotification(title, body, iconEmoji = "🚦", tag = null) {
+
+        if (!this.isNotificationSupported()) return;
+        if (Notification.permission !== "granted") return;
+
+        try {
+
+            const options = {
+                body: body,
+                tag: tag || `citypulse-${Date.now()}`,
+                renotify: true,
+                silent: false
+            };
+
+            const notification = new Notification(title, options);
+
+            notification.onclick = function () {
+                window.focus();
+                notification.close();
+            };
+
+            setTimeout(() => {
+                notification.close();
+            }, 8000);
+
+        } catch (error) {
+            console.warn("Could not show notification:", error);
+        }
+
+    },
+
+
+    showEmergencyBanner(title, message) {
+
+        const banner = document.getElementById("emergency-banner");
+        const titleEl = document.getElementById("emergency-banner-title");
+        const messageEl = document.getElementById("emergency-banner-message");
+
+        if (!banner) return;
+
+        if (titleEl) titleEl.textContent = title || "EMERGENCY DISPATCHED";
+        if (messageEl) messageEl.textContent = message || "";
+
+        banner.style.display = "flex";
+
+        if (this.emergencyBannerTimer) {
+            clearTimeout(this.emergencyBannerTimer);
+        }
+
+        this.emergencyBannerTimer = setTimeout(() => {
+            this.dismissEmergencyBanner();
+        }, 30000);
+
+    },
+
+
+    dismissEmergencyBanner() {
+
+        const banner = document.getElementById("emergency-banner");
+        if (banner) banner.style.display = "none";
+
+        if (this.emergencyBannerTimer) {
+            clearTimeout(this.emergencyBannerTimer);
+            this.emergencyBannerTimer = null;
+        }
+
+    },
+
+
+    handleEmergencyBroadcast(payload) {
+
+        if (!payload) return;
+
+        const emergencyType = payload.emergencyType || "AMBULANCE";
+        const startLocation = payload.startLocationName || "Unknown";
+        const destination = payload.destinationName || "Unknown";
+        const eta = payload.estimatedMinutes;
+        const message = payload.message ||
+            `${emergencyType} dispatched from ${startLocation} → ${destination}`;
+
+        this.showEmergencyBanner(
+            `🚨 ${emergencyType} DISPATCHED`,
+            message + (eta ? ` — ETA ${eta} min` : "")
+        );
+
+        this.showNotification(
+            `🚨 EMERGENCY: ${emergencyType}`,
+            message,
+            "🚨",
+            "emergency-dispatch"
+        );
+
+        console.log("[Emergency Broadcast]", payload);
+
+    },
+
+
     async loadDashboard() {
+        if (!this.authToken) {
+            this.updateApiConnectionStatus(false);
+            return;
+        }
 
         try {
 
             await Promise.all([
-
                 this.loadRoads(),
-
                 this.loadLocations(),
-
                 this.loadLiveTraffic()
-
             ]);
 
             this.updateDashboardStatistics();
 
-            this.updateTrafficOverview();
+            try {
+                await this.loadFavoriteRoads();
+            } catch (favError) {
+                console.warn("Favorites preload skipped:", favError);
+            }
 
+            this.updateTrafficOverview();
             this.updateApiConnectionStatus(true);
 
         } catch (error) {
 
             console.error("Dashboard loading failed:", error);
-
             this.updateApiConnectionStatus(false);
-
             this.showDashboardError();
 
         }
@@ -367,9 +477,7 @@ const CityPulseApp = {
     async loadRoads() {
 
         const data = await this.apiRequest("/api/roads");
-
         this.roads = Array.isArray(data) ? data : [];
-
         return this.roads;
 
     },
@@ -378,9 +486,7 @@ const CityPulseApp = {
     async loadLocations() {
 
         const data = await this.apiRequest("/api/locations");
-
         this.locations = Array.isArray(data) ? data : [];
-
         return this.locations;
 
     },
@@ -389,34 +495,74 @@ const CityPulseApp = {
     async loadLiveTraffic() {
 
         const data = await this.apiRequest("/api/traffic/live");
-
         this.trafficRecords = Array.isArray(data) ? data : [];
-
         return this.trafficRecords;
 
     },
 
 
+    getSelectedCityLocationIds() {
+
+        if (!this.selectedCity || !this.locations) return null;
+
+        const cityLower = String(this.selectedCity).toLowerCase();
+        const ids = new Set();
+
+        this.locations.forEach(loc => {
+            if (String(loc.city || "").toLowerCase() === cityLower) {
+                ids.add(Number(loc.id));
+            }
+        });
+
+        return ids;
+    },
+
+
+    getFilteredTrafficRecords() {
+
+        const cityIds = this.getSelectedCityLocationIds();
+
+        if (!cityIds) return this.trafficRecords;
+
+        return this.trafficRecords.filter(rec => {
+            const lid = Number(
+                (rec.location && rec.location.id) || rec.locationId
+            );
+            return cityIds.has(lid);
+        });
+    },
+
+
+    resolveRecordRoadId(record) {
+
+        if (!record) return 0;
+
+        const raw = record.roadId !== undefined && record.roadId !== null
+            ? record.roadId
+            : (record.road && record.road.id !== undefined && record.road.id !== null
+                ? record.road.id
+                : null);
+
+        const numeric = Number(raw);
+
+        return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+    },
+
+
     updateDashboardStatistics() {
 
-        const activeRoads =
-            this.roads.filter(road => road.active === true).length;
+        const filteredRecords = this.getFilteredTrafficRecords();
 
-        const activeLocations =
-            this.locations.filter(location => location.active === true).length;
+        const activeRoads = this.roads.filter(road => road.active === true).length;
+        const activeLocations = this.locations.filter(location => location.active === true).length;
 
-        const severeTraffic =
-            this.trafficRecords.filter(record =>
-                String(record.trafficLevel).toUpperCase() === "SEVERE"
-            ).length;
-
+        const severeTraffic = filteredRecords.filter(record =>
+            String(record.trafficLevel).toUpperCase() === "SEVERE"
+        ).length;
 
         this.setElementText("active-roads", activeRoads);
-
-        this.setElementText("traffic-records", this.trafficRecords.length);
-
+        this.setElementText("traffic-records", filteredRecords.length);
         this.setElementText("severe-traffic", severeTraffic);
-
         this.setElementText("locations-count", activeLocations);
 
     },
@@ -424,66 +570,66 @@ const CityPulseApp = {
 
     updateTrafficOverview() {
 
-        const container =
-            document.getElementById("traffic-overview");
+        const container = document.getElementById("traffic-overview");
 
         if (!container) return;
 
+        const filteredRecords = this.getFilteredTrafficRecords();
 
-        if (this.trafficRecords.length === 0) {
-
+        if (filteredRecords.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
-                    No live traffic data available.
+                    No live traffic data available${this.selectedCity ? ` for ${this.escapeHtml(this.selectedCity)}` : ""}.
                 </div>
             `;
-
             return;
-
         }
 
-
         container.innerHTML =
-            this.trafficRecords.slice(0, 8).map(record => {
+            filteredRecords.slice(0, 8).map(record => {
 
-                const road = this.findRoad(record.roadId);
-
-                const roadName = road
+                const road = (record.road && record.road.name)
+                    ? record.road
+                    : this.findRoad(record.roadId);
+                const roadName = (road && road.name)
                     ? road.name
-                    : `Road ${record.roadId}`;
+                    : (record.roadName || `Road ${record.roadId || "?"}`);
+                const trafficLevel = String(record.trafficLevel || "UNKNOWN").toUpperCase();
+                const levelClass = this.getTrafficLevelClass(trafficLevel);
 
-                const trafficLevel =
-                    String(record.trafficLevel || "UNKNOWN").toUpperCase();
+                const safeRoadId = this.resolveRecordRoadId(record);
+                const isFav = safeRoadId > 0 && this.favoriteRoadIds.has(safeRoadId);
 
-                const levelClass =
-                    this.getTrafficLevelClass(trafficLevel);
+                const starMarkup = safeRoadId > 0
+                    ? `<span
+                            onclick="CityPulseApp.toggleFavoriteRoad(${safeRoadId})"
+                            style="cursor: pointer;
+                                   margin-left: 8px;
+                                   color: ${isFav ? '#f59e0b' : '#64748b'};
+                                   font-size: 16px;"
+                            title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                            ${isFav ? '⭐' : '☆'}
+                        </span>`
+                    : "";
 
                 return `
                     <div class="traffic-item">
-
                         <div>
-
                             <div class="traffic-item-name">
                                 ${this.escapeHtml(roadName)}
+                                ${starMarkup}
                             </div>
-
                             <div class="traffic-item-details">
-                                ${this.formatNumber(record.vehicleCount)}
-                                vehicles
+                                ${this.formatNumber(record.vehicleCount)} vehicles
                                 &nbsp;•&nbsp;
-                                ${this.formatNumber(record.averageSpeed)}
-                                km/h
+                                ${this.formatNumber(record.averageSpeed)} km/h
                                 &nbsp;•&nbsp;
-                                Density
-                                ${this.formatNumber(record.trafficDensity)}%
+                                Density ${this.formatNumber(record.trafficDensity)}%
                             </div>
-
                         </div>
-
                         <span class="traffic-level ${levelClass}">
                             ${this.escapeHtml(trafficLevel)}
                         </span>
-
                     </div>
                 `;
 
@@ -497,29 +643,27 @@ const CityPulseApp = {
         try {
 
             await Promise.all([
-
                 this.loadRoads(),
-
                 this.loadLocations(),
-
                 this.loadLiveTraffic()
-
             ]);
 
             this.updateDashboardStatistics();
 
+            try {
+                await this.loadFavoriteRoads();
+            } catch (favError) {
+                console.warn("Favorites preload skipped:", favError);
+            }
+
             this.renderLiveTrafficTable();
-
             this.initializeTrafficMap();
-
             this.updateApiConnectionStatus(true);
 
         } catch (error) {
 
             console.error("Live traffic page loading failed:", error);
-
             this.updateApiConnectionStatus(false);
-
             this.renderTrafficPageError();
 
         }
@@ -529,74 +673,71 @@ const CityPulseApp = {
 
     renderLiveTrafficTable() {
 
-        const tableBody =
-            document.getElementById("traffic-table-body");
-
-        const emptyState =
-            document.getElementById("traffic-empty-state");
+        const tableBody = document.getElementById("traffic-table-body");
+        const emptyState = document.getElementById("traffic-empty-state");
 
         if (!tableBody) return;
 
+        const filteredRecords = this.getFilteredTrafficRecords();
 
-        if (!this.trafficRecords || this.trafficRecords.length === 0) {
-
+        if (!filteredRecords || filteredRecords.length === 0) {
             tableBody.innerHTML = "";
-
             if (emptyState) emptyState.style.display = "block";
-
             return;
-
         }
 
         if (emptyState) emptyState.style.display = "none";
 
-
         tableBody.innerHTML =
-            this.trafficRecords.map(record => {
+            filteredRecords.map(record => {
 
-                const road = this.findRoad(record.roadId);
+                const road = (record.road && record.road.name)
+                    ? record.road
+                    : this.findRoad(record.roadId);
+                const location = (record.location && record.location.name)
+                    ? record.location
+                    : this.findLocation(record.locationId);
+                const level = String(record.trafficLevel || "UNKNOWN").toUpperCase();
 
-                const location = this.findLocation(record.locationId);
+                const roadName = (road && road.name)
+                    ? road.name
+                    : (record.roadName || `Road ${record.roadId || "?"}`);
 
-                const level =
-                    String(record.trafficLevel || "UNKNOWN").toUpperCase();
+                const locationName = (location && location.name)
+                    ? location.name
+                    : (record.locationName || "N/A");
+
+                const safeRoadId = this.resolveRecordRoadId(record);
+                const isFav = safeRoadId > 0 && this.favoriteRoadIds.has(safeRoadId);
+
+                const starMarkup = safeRoadId > 0
+                    ? `<span
+                            onclick="CityPulseApp.toggleFavoriteRoad(${safeRoadId})"
+                            style="cursor: pointer;
+                                   margin-left: 8px;
+                                   color: ${isFav ? '#f59e0b' : '#64748b'};
+                                   font-size: 16px;"
+                            title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+                            ${isFav ? '⭐' : '☆'}
+                        </span>`
+                    : "";
 
                 return `
                     <tr>
-
                         <td>
-                            ${this.escapeHtml(
-                                road?.name || `Road ${record.roadId}`
-                            )}
+                            ${this.escapeHtml(roadName)}
+                            ${starMarkup}
                         </td>
-
-                        <td>
-                            ${this.escapeHtml(location?.name || "N/A")}
-                        </td>
-
-                        <td>
-                            ${this.formatNumber(record.vehicleCount)}
-                        </td>
-
-                        <td>
-                            ${this.formatNumber(record.averageSpeed)}
-                            km/h
-                        </td>
-
-                        <td>
-                            ${this.formatNumber(record.trafficDensity)}%
-                        </td>
-
+                        <td>${this.escapeHtml(locationName)}</td>
+                        <td>${this.formatNumber(record.vehicleCount)}</td>
+                        <td>${this.formatNumber(record.averageSpeed)} km/h</td>
+                        <td>${this.formatNumber(record.trafficDensity)}%</td>
                         <td>
                             <span class="traffic-level ${this.getTrafficLevelClass(level)}">
                                 ${this.escapeHtml(level)}
                             </span>
                         </td>
-
-                        <td>
-                            ${this.formatDateTime(record.recordedAt)}
-                        </td>
-
+                        <td>${this.formatDateTime(record.recordedAt)}</td>
                     </tr>
                 `;
 
@@ -607,8 +748,7 @@ const CityPulseApp = {
 
     initializeTrafficMap() {
 
-        const mapElement =
-            document.getElementById("traffic-map");
+        const mapElement = document.getElementById("traffic-map");
 
         if (!mapElement) return;
 
@@ -618,29 +758,20 @@ const CityPulseApp = {
         }
 
         if (this.trafficMap) {
-
             this.trafficMap.invalidateSize();
-
             this.updateTrafficMapMarkers();
-
             return;
-
         }
 
-
-        this.trafficMap =
-            L.map(mapElement).setView([12.9716, 77.5946], 12);
-
+        this.trafficMap = L.map(mapElement).setView([12.9716, 77.5946], 12);
 
         L.tileLayer(
             "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
             {
                 maxZoom: 19,
-                attribution:
-                    "&copy; OpenStreetMap contributors"
+                attribution: "&copy; OpenStreetMap contributors"
             }
         ).addTo(this.trafficMap);
-
 
         this.updateTrafficMapMarkers();
 
@@ -651,141 +782,85 @@ const CityPulseApp = {
 
         if (!this.trafficMap) return;
 
-
         this.trafficMarkers.forEach(
             marker => this.trafficMap.removeLayer(marker)
         );
 
         this.trafficMarkers = [];
 
+        const filteredRecords = this.getFilteredTrafficRecords();
 
         const locationsWithTraffic =
-            this.trafficRecords.map(record => {
-
-                const location = this.findLocation(record.locationId);
-
+            filteredRecords.map(record => {
+                const location = (record.location && record.location.name)
+                    ? record.location
+                    : this.findLocation(record.locationId);
                 return { record, location };
-
             }).filter(item =>
                 item.location &&
                 item.location.latitude !== null &&
                 item.location.longitude !== null
             );
 
-
         const latestByLocation = new Map();
-
 
         locationsWithTraffic.forEach(item => {
 
             const locationId = Number(item.location.id);
-
             const existing = latestByLocation.get(locationId);
 
             if (!existing) {
-
                 latestByLocation.set(locationId, item);
-
                 return;
-
             }
 
-
-            const currentDate =
-                new Date(item.record.recordedAt || 0);
-
-            const existingDate =
-                new Date(existing.record.recordedAt || 0);
+            const currentDate = new Date(item.record.recordedAt || 0);
+            const existingDate = new Date(existing.record.recordedAt || 0);
 
             if (currentDate >= existingDate) {
-
                 latestByLocation.set(locationId, item);
-
             }
 
         });
 
-
         const markerColors = {
-
-            LOW: {
-                color: "#16a34a",
-                fillColor: "#22c55e"
-            },
-
-            MODERATE: {
-                color: "#ca8a04",
-                fillColor: "#eab308"
-            },
-
-            HIGH: {
-                color: "#ea580c",
-                fillColor: "#f97316"
-            },
-
-            SEVERE: {
-                color: "#dc2626",
-                fillColor: "#ef4444"
-            },
-
-            UNKNOWN: {
-                color: "#64748b",
-                fillColor: "#94a3b8"
-            }
-
+            LOW: { color: "#16a34a", fillColor: "#22c55e" },
+            MODERATE: { color: "#ca8a04", fillColor: "#eab308" },
+            HIGH: { color: "#ea580c", fillColor: "#f97316" },
+            SEVERE: { color: "#dc2626", fillColor: "#ef4444" },
+            UNKNOWN: { color: "#64748b", fillColor: "#94a3b8" }
         };
-
 
         latestByLocation.forEach(item => {
 
             const record = item.record;
-
             const location = item.location;
+            const level = String(record.trafficLevel || "UNKNOWN").toUpperCase();
+            const selectedColor = markerColors[level] || markerColors.UNKNOWN;
 
-            const level =
-                String(record.trafficLevel || "UNKNOWN").toUpperCase();
-
-            const selectedColor =
-                markerColors[level] || markerColors.UNKNOWN;
-
-
-            const marker =
-                L.circleMarker(
-                    [
-                        Number(location.latitude),
-                        Number(location.longitude)
-                    ],
-                    {
-                        radius: 10,
-                        color: selectedColor.color,
-                        fillColor: selectedColor.fillColor,
-                        weight: 3,
-                        opacity: 1,
-                        fillOpacity: 0.85
-                    }
-                );
-
+            const marker = L.circleMarker(
+                [Number(location.latitude), Number(location.longitude)],
+                {
+                    radius: 10,
+                    color: selectedColor.color,
+                    fillColor: selectedColor.fillColor,
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.85
+                }
+            );
 
             marker.bindPopup(`
                 <strong>${this.escapeHtml(location.name)}</strong>
-                <br>
-                Traffic: <strong>${this.escapeHtml(level)}</strong>
-                <br>
-                Vehicles: ${this.formatNumber(record.vehicleCount)}
-                <br>
-                Speed: ${this.formatNumber(record.averageSpeed)} km/h
-                <br>
-                Density: ${this.formatNumber(record.trafficDensity)}%
-                <br>
-                Congestion: ${this.formatNumber(record.congestionScore)}
-                <br>
-                Updated:
-                ${this.escapeHtml(this.formatDateTime(record.recordedAt))}
+                <br>Traffic: <strong>${this.escapeHtml(level)}</strong>
+                <br>Vehicles: ${this.formatNumber(record.vehicleCount)}
+                <br>Speed: ${this.formatNumber(record.averageSpeed)} km/h
+                <br>Density: ${this.formatNumber(record.trafficDensity)}%
+                <br>Congestion: ${this.formatNumber(record.congestionScore)}
+                <br>Updated: ${this.escapeHtml(this.formatDateTime(record.recordedAt))}
             `);
 
-
             marker.addTo(this.trafficMap);
-
             this.trafficMarkers.push(marker);
 
         });
@@ -793,17 +868,84 @@ const CityPulseApp = {
     },
 
 
+    setupCityFilter() {
+
+        const select = document.getElementById("city-filter-select");
+        const status = document.getElementById("city-filter-status");
+
+        if (!select) return;
+
+        const applyFilter = () => {
+
+            const city = String(select.value || "").trim();
+
+            this.selectedCity = city || null;
+
+            if (window.CityPulseRoadPulse) {
+                window.CityPulseRoadPulse.setCityFilter(city);
+            }
+
+            if (status) {
+                if (city) {
+                    const filtered = this.getFilteredTrafficRecords();
+                    status.textContent = `Filtering to ${city} — ${filtered.length} records`;
+                } else {
+                    status.textContent = `All cities — ${this.trafficRecords.length} records`;
+                }
+            }
+
+            this.updateDashboardStatistics();
+            this.updateTrafficOverview();
+
+            const activeSection = document.querySelector(".page-section.active-section");
+            if (activeSection && activeSection.id === "traffic-section") {
+                this.renderLiveTrafficTable();
+                this.updateTrafficMapMarkers();
+            }
+
+            this.populatePredictionRoadSelect();
+            this.loadTrendChartPage();
+        };
+
+        const stored = localStorage.getItem("citypulse.selectedCity");
+        if (stored) {
+            select.value = stored;
+            this.selectedCity = stored;
+        }
+
+        select.addEventListener("change", () => {
+            const v = String(select.value || "").trim();
+            if (v) {
+                localStorage.setItem("citypulse.selectedCity", v);
+            } else {
+                localStorage.removeItem("citypulse.selectedCity");
+            }
+            applyFilter();
+        });
+
+        // apply current filter on load
+        applyFilter();
+
+    },
+
+
     setupEmergencyControls() {
 
-        const button =
-            document.getElementById("simulate-emergency-button");
+        const simulateButton = document.getElementById("simulate-emergency-button");
+        if (simulateButton) {
+            simulateButton.addEventListener(
+                "click",
+                () => this.simulateEmergencyRoute()
+            );
+        }
 
-        if (!button) return;
-
-        button.addEventListener(
-            "click",
-            () => this.simulateEmergencyRoute()
-        );
+        const broadcastButton = document.getElementById("broadcast-emergency-button");
+        if (broadcastButton) {
+            broadcastButton.addEventListener(
+                "click",
+                () => this.broadcastEmergency()
+            );
+        }
 
     },
 
@@ -817,7 +959,6 @@ const CityPulseApp = {
             }
 
             this.populateEmergencyLocationSelects();
-
             this.clearEmergencyResults();
 
             this.showEmergencyMessage(
@@ -828,7 +969,6 @@ const CityPulseApp = {
         } catch (error) {
 
             console.error("Emergency page loading failed:", error);
-
             this.showEmergencyMessage(
                 "Unable to load emergency route data.",
                 "error"
@@ -841,40 +981,31 @@ const CityPulseApp = {
 
     populateEmergencyLocationSelects() {
 
-        const startSelect =
-            document.getElementById("emergency-start");
-
-        const destinationSelect =
-            document.getElementById("emergency-destination");
+        const startSelect = document.getElementById("emergency-start");
+        const destinationSelect = document.getElementById("emergency-destination");
 
         if (!startSelect || !destinationSelect) return;
 
-
         const activeLocations =
             this.locations.filter(location => location.active !== false);
-
 
         const options = placeholder => {
 
             let html = `<option value="">${placeholder}</option>`;
 
             activeLocations.forEach(location => {
-
                 html += `
                     <option value="${location.id}">
                         ${this.escapeHtml(location.name)}
                     </option>
                 `;
-
             });
 
             return html;
 
         };
 
-
         startSelect.innerHTML = options("Select start location");
-
         destinationSelect.innerHTML = options("Select destination");
 
     },
@@ -882,76 +1013,50 @@ const CityPulseApp = {
 
     async simulateEmergencyRoute() {
 
-        const emergencyType =
-            document.getElementById("emergency-type")?.value;
-
-        const startLocationId =
-            document.getElementById("emergency-start")?.value;
-
-        const destinationLocationId =
-            document.getElementById("emergency-destination")?.value;
-
-        const button =
-            document.getElementById("simulate-emergency-button");
-
+        const emergencyType = document.getElementById("emergency-type")?.value;
+        const startLocationId = document.getElementById("emergency-start")?.value;
+        const destinationLocationId = document.getElementById("emergency-destination")?.value;
+        const button = document.getElementById("simulate-emergency-button");
 
         if (!emergencyType) {
-
-            this.showEmergencyMessage(
-                "Please select an emergency type.",
-                "error"
-            );
-
+            this.showEmergencyMessage("Please select an emergency type.", "error");
             return;
-
         }
 
         if (!startLocationId || !destinationLocationId) {
-
             this.showEmergencyMessage(
                 "Please select both a start location and destination.",
                 "error"
             );
-
             return;
-
         }
 
         if (startLocationId === destinationLocationId) {
-
             this.showEmergencyMessage(
                 "Start and destination locations must be different.",
                 "error"
             );
-
             return;
-
         }
-
 
         if (button) {
             button.disabled = true;
             button.textContent = "Simulating...";
         }
 
-
         try {
 
-            const data =
-                await this.apiRequest(
-                    "/api/emergency-routes/simulate",
-                    {
-                        method: "POST",
-                        body: {
-                            emergencyType,
-                            startLocationId:
-                                Number(startLocationId),
-                            destinationLocationId:
-                                Number(destinationLocationId)
-                        }
+            const data = await this.apiRequest(
+                "/api/emergency-routes/simulate",
+                {
+                    method: "POST",
+                    body: {
+                        emergencyType,
+                        startLocationId: Number(startLocationId),
+                        destinationLocationId: Number(destinationLocationId)
                     }
-                );
-
+                }
+            );
 
             this.renderEmergencyResults(data);
 
@@ -963,10 +1068,8 @@ const CityPulseApp = {
         } catch (error) {
 
             console.error("Emergency simulation failed:", error);
-
             this.showEmergencyMessage(
-                error.message ||
-                "Emergency route simulation failed.",
+                error.message || "Emergency route simulation failed.",
                 "error"
             );
 
@@ -982,13 +1085,68 @@ const CityPulseApp = {
     },
 
 
+    async broadcastEmergency() {
+
+        const emergencyType = document.getElementById("emergency-type")?.value || "AMBULANCE";
+        const startSelect = document.getElementById("emergency-start");
+        const destinationSelect = document.getElementById("emergency-destination");
+
+        const startName = startSelect?.options[startSelect.selectedIndex]?.text || "Unknown";
+        const destinationName = destinationSelect?.options[destinationSelect.selectedIndex]?.text || "Unknown";
+
+        const button = document.getElementById("broadcast-emergency-button");
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Broadcasting...";
+        }
+
+        try {
+
+            const response = await this.apiRequest(
+                "/api/emergency-routes/broadcast",
+                {
+                    method: "POST",
+                    body: {
+                        emergencyType: emergencyType,
+                        startLocationName: startName,
+                        destinationName: destinationName,
+                        estimatedMinutes: null,
+                        priorityStatus: "HIGH"
+                    }
+                }
+            );
+
+            console.log("[Broadcast Response]", response);
+
+            this.showEmergencyMessage(
+                `🚨 Emergency broadcast sent to all users: ${emergencyType} from ${startName} → ${destinationName}`,
+                "success"
+            );
+
+        } catch (error) {
+
+            console.error("Emergency broadcast failed:", error);
+            this.showEmergencyMessage(
+                error.message || "Emergency broadcast failed.",
+                "error"
+            );
+
+        } finally {
+
+            if (button) {
+                button.disabled = false;
+                button.textContent = "📢 Broadcast Emergency";
+            }
+
+        }
+
+    },
+
+
     renderEmergencyResults(data) {
 
-        const panel =
-            document.getElementById("emergency-results-panel");
-
+        const panel = document.getElementById("emergency-results-panel");
         if (!panel) return;
-
 
         this.setElementText(
             "emergency-distance",
@@ -1012,32 +1170,18 @@ const CityPulseApp = {
 
         this.setElementText(
             "emergency-congestion",
-            data.congestionScore !== null &&
-            data.congestionScore !== undefined
+            data.congestionScore !== null && data.congestionScore !== undefined
                 ? this.formatNumber(data.congestionScore, 2)
                 : "N/A"
         );
 
-        this.setElementText(
-            "emergency-priority",
-            data.priorityStatus || "N/A"
-        );
-
-        this.setElementText(
-            "emergency-signal",
-            data.signalPriority || "N/A"
-        );
-
-        this.setElementText(
-            "emergency-simulation-status",
-            data.simulationStatus || "N/A"
-        );
-
+        this.setElementText("emergency-priority", data.priorityStatus || "N/A");
+        this.setElementText("emergency-signal", data.signalPriority || "N/A");
+        this.setElementText("emergency-simulation-status", data.simulationStatus || "N/A");
         this.setElementText(
             "emergency-result-message",
             data.message || "Emergency route simulation completed."
         );
-
 
         panel.style.display = "block";
 
@@ -1046,15 +1190,11 @@ const CityPulseApp = {
 
     showEmergencyMessage(message, type = "info") {
 
-        const element =
-            document.getElementById("emergency-analysis-message");
-
+        const element = document.getElementById("emergency-analysis-message");
         if (!element) return;
 
         element.textContent = message || "";
-
         element.className = "route-message";
-
         element.classList.add(`route-message-${type}`);
 
     },
@@ -1062,9 +1202,7 @@ const CityPulseApp = {
 
     clearEmergencyResults() {
 
-        const panel =
-            document.getElementById("emergency-results-panel");
-
+        const panel = document.getElementById("emergency-results-panel");
         if (panel) panel.style.display = "none";
 
     },
@@ -1072,41 +1210,29 @@ const CityPulseApp = {
 
     setupPredictionControls() {
 
-        const roadSelect =
-            document.getElementById("prediction-road-select");
-
-        const generateButton =
-            document.getElementById("generate-predictions-button");
-
-        const refreshButton =
-            document.getElementById("refresh-predictions-button");
-
+        const roadSelect = document.getElementById("prediction-road-select");
+        const generateButton = document.getElementById("generate-predictions-button");
+        const refreshButton = document.getElementById("refresh-predictions-button");
 
         if (generateButton) {
-
             generateButton.addEventListener(
                 "click",
                 () => this.generatePredictionsForSelectedRoad()
             );
-
         }
 
         if (refreshButton) {
-
             refreshButton.addEventListener(
                 "click",
                 () => this.loadPredictionPage()
             );
-
         }
 
         if (roadSelect) {
-
             roadSelect.addEventListener(
                 "change",
                 () => this.loadPredictionDataForSelectedRoad()
             );
-
         }
 
     },
@@ -1125,25 +1251,18 @@ const CityPulseApp = {
 
             this.populatePredictionRoadSelect();
 
-
-            const select =
-                document.getElementById("prediction-road-select");
+            const select = document.getElementById("prediction-road-select");
 
             if (select && !select.value && this.roads.length > 0) {
-
                 select.value = String(this.roads[0].id);
-
             }
 
             if (!select || !select.value) {
-
                 this.showPredictionMessage(
                     "No roads are available for traffic prediction.",
                     "info"
                 );
-
                 return;
-
             }
 
             await this.loadPredictionDataForSelectedRoad();
@@ -1151,9 +1270,7 @@ const CityPulseApp = {
         } catch (error) {
 
             console.error("Prediction page failed:", error);
-
             this.clearPredictionResults();
-
             this.showPredictionMessage(
                 "Unable to load Traffic Prediction.",
                 "error"
@@ -1166,9 +1283,7 @@ const CityPulseApp = {
 
     populatePredictionRoadSelect() {
 
-        const select =
-            document.getElementById("prediction-road-select");
-
+        const select = document.getElementById("prediction-road-select");
         if (!select) return;
 
         const current = select.value;
@@ -1180,26 +1295,17 @@ const CityPulseApp = {
         `;
 
         this.roads.forEach(road => {
-
             const option = document.createElement("option");
-
             option.value = String(road.id);
-
-            option.textContent =
-                road.name || `Road ${road.id}`;
-
+            option.textContent = road.name || `Road ${road.id}`;
             select.appendChild(option);
-
         });
-
 
         if (
             current &&
             this.roads.some(road => String(road.id) === String(current))
         ) {
-
             select.value = current;
-
         }
 
     },
@@ -1207,46 +1313,30 @@ const CityPulseApp = {
 
     async loadPredictionDataForSelectedRoad() {
 
-        const select =
-            document.getElementById("prediction-road-select");
+        const select = document.getElementById("prediction-road-select");
 
         if (!select || !select.value) {
-
             this.clearPredictionResults();
-
             return;
-
         }
 
         const roadId = Number(select.value);
-
 
         try {
 
             const [predictions, traffic] =
                 await Promise.all([
-
-                    this.apiRequest(
-                        `/api/predictions/road/${roadId}`
-                    ),
-
+                    this.apiRequest(`/api/predictions/road/${roadId}`),
                     this.apiRequest("/api/traffic")
-
                 ]);
 
-
-            this.predictions =
-                Array.isArray(predictions) ? predictions : [];
-
-            this.trafficRecords =
-                Array.isArray(traffic) ? traffic : [];
-
+            this.predictions = Array.isArray(predictions) ? predictions : [];
+            this.trafficRecords = Array.isArray(traffic) ? traffic : [];
 
             const roadTraffic =
                 this.trafficRecords
-                    .filter(record =>
-                        Number(record.roadId) === roadId
-                    )
+                    .filter(record => Number(record.roadId) === roadId ||
+                                      (record.road && Number(record.road.id) === roadId))
                     .sort((a, b) =>
                         new Date(b.recordedAt || 0) -
                         new Date(a.recordedAt || 0)
@@ -1254,36 +1344,28 @@ const CityPulseApp = {
 
             const latest = roadTraffic[0] || null;
 
-
             let weather = null;
 
-            if (latest && latest.locationId) {
+            const latestLocationId = latest
+                ? Number(
+                    (latest.location && latest.location.id) ||
+                    latest.locationId
+                  )
+                : null;
 
+            if (latestLocationId && Number.isFinite(latestLocationId)) {
                 try {
-
-                    weather =
-                        await this.apiRequest(
-                            `/api/weather/impact/${latest.locationId}`
-                        );
-
-                } catch (error) {
-
-                    console.warn(
-                        "Weather impact unavailable:",
-                        error
+                    weather = await this.apiRequest(
+                        `/api/weather/impact/${latestLocationId}`
                     );
-
+                } catch (error) {
+                    console.warn("Weather impact unavailable:", error);
                 }
-
             }
 
-
             this.renderPredictionCurrentTraffic(latest);
-
             this.renderPredictionWeather(weather);
-
             this.renderPredictionResults(this.predictions);
-
 
             this.showPredictionMessage(
                 this.predictions.length > 0
@@ -1295,9 +1377,7 @@ const CityPulseApp = {
         } catch (error) {
 
             console.error("Prediction loading failed:", error);
-
             this.clearPredictionResults();
-
             this.showPredictionMessage(
                 "Unable to load prediction data.",
                 "error"
@@ -1310,23 +1390,17 @@ const CityPulseApp = {
 
     async generatePredictionsForSelectedRoad() {
 
-        const select =
-            document.getElementById("prediction-road-select");
+        const select = document.getElementById("prediction-road-select");
 
         if (!select || !select.value) {
-
             this.showPredictionMessage(
                 "Select a road before generating predictions.",
                 "error"
             );
-
             return;
-
         }
 
-        const button =
-            document.getElementById("generate-predictions-button");
-
+        const button = document.getElementById("generate-predictions-button");
 
         try {
 
@@ -1335,15 +1409,12 @@ const CityPulseApp = {
                 button.textContent = "Generating...";
             }
 
-
             await this.apiRequest(
                 `/api/predictions/generate/${Number(select.value)}`,
                 { method: "POST" }
             );
 
-
             await this.loadPredictionDataForSelectedRoad();
-
 
             this.showPredictionMessage(
                 "Traffic predictions generated successfully.",
@@ -1353,7 +1424,6 @@ const CityPulseApp = {
         } catch (error) {
 
             console.error("Prediction generation failed:", error);
-
             this.showPredictionMessage(
                 "Unable to generate traffic predictions.",
                 "error"
@@ -1370,6 +1440,7 @@ const CityPulseApp = {
 
     },
 
+
     renderPredictionCurrentTraffic(traffic) {
 
         this.setElementText(
@@ -1384,21 +1455,9 @@ const CityPulseApp = {
 
         if (!weather) {
 
-            this.setElementText(
-                "prediction-weather-score",
-                "NOT AVAILABLE"
-            );
-
-            this.setElementText(
-                "prediction-weather-level",
-                "NOT AVAILABLE"
-            );
-
-            this.setElementText(
-                "prediction-model",
-                "CITYPULSE-TREND-V1"
-            );
-
+            this.setElementText("prediction-weather-score", "NOT AVAILABLE");
+            this.setElementText("prediction-weather-level", "NOT AVAILABLE");
+            this.setElementText("prediction-model", "CITYPULSE-TREND-V1");
             this.setElementText(
                 "prediction-weather-summary",
                 "Weather data is not available for the selected road."
@@ -1407,7 +1466,6 @@ const CityPulseApp = {
             return;
 
         }
-
 
         this.setElementText(
             "prediction-weather-score",
@@ -1426,19 +1484,10 @@ const CityPulseApp = {
                 : "CITYPULSE-TREND-V1"
         );
 
-
-        const condition =
-            weather.weatherCondition || "UNKNOWN";
-
-        const temperature =
-            this.formatPredictionNumber(weather.temperature, 1);
-
-        const rainfall =
-            this.formatPredictionNumber(weather.rainfall, 1);
-
-        const visibility =
-            this.formatPredictionNumber(weather.visibility, 1);
-
+        const condition = weather.weatherCondition || "UNKNOWN";
+        const temperature = this.formatPredictionNumber(weather.temperature, 1);
+        const rainfall = this.formatPredictionNumber(weather.rainfall, 1);
+        const visibility = this.formatPredictionNumber(weather.visibility, 1);
 
         this.setElementText(
             "prediction-weather-summary",
@@ -1450,38 +1499,25 @@ const CityPulseApp = {
 
     renderPredictionResults(predictions) {
 
-        const container =
-            document.getElementById("prediction-results");
-
-        const empty =
-            document.getElementById("prediction-empty-state");
+        const container = document.getElementById("prediction-results");
+        const empty = document.getElementById("prediction-empty-state");
 
         if (!container) return;
 
-
-        const latest =
-            this.getLatestPredictionsByHorizon(predictions);
-
+        const latest = this.getLatestPredictionsByHorizon(predictions);
 
         if (latest.size === 0) {
-
             container.innerHTML = "";
-
             if (empty) empty.style.display = "block";
-
             return;
-
         }
 
         if (empty) empty.style.display = "none";
 
-
         container.innerHTML =
             [15, 30, 45, 60]
                 .filter(horizon => latest.has(horizon))
-                .map(horizon =>
-                    this.buildPredictionCard(latest.get(horizon))
-                )
+                .map(horizon => this.buildPredictionCard(latest.get(horizon)))
                 .join("");
 
     },
@@ -1493,41 +1529,27 @@ const CityPulseApp = {
 
         (predictions || []).forEach(prediction => {
 
-            const horizon =
-                Number(prediction.predictionHorizonMinutes);
+            const horizon = Number(prediction.predictionHorizonMinutes);
 
             if (!Number.isFinite(horizon)) return;
 
             const existing = result.get(horizon);
 
             if (!existing) {
-
                 result.set(horizon, prediction);
-
                 return;
-
             }
 
+            const currentDate = new Date(
+                prediction.createdAt || prediction.predictionTime || 0
+            );
 
-            const currentDate =
-                new Date(
-                    prediction.createdAt ||
-                    prediction.predictionTime ||
-                    0
-                );
-
-            const existingDate =
-                new Date(
-                    existing.createdAt ||
-                    existing.predictionTime ||
-                    0
-                );
-
+            const existingDate = new Date(
+                existing.createdAt || existing.predictionTime || 0
+            );
 
             if (currentDate >= existingDate) {
-
                 result.set(horizon, prediction);
-
             }
 
         });
@@ -1539,92 +1561,50 @@ const CityPulseApp = {
 
     buildPredictionCard(prediction) {
 
-        const horizon =
-            Number(prediction.predictionHorizonMinutes);
-
+        const horizon = Number(prediction.predictionHorizonMinutes);
 
         return `
             <div class="prediction-card">
-
                 <div class="prediction-card-header">
-
                     <div>
-
                         <span class="prediction-horizon">
                             +${horizon} MIN
                         </span>
-
                         <h4>
-                            ${this.escapeHtml(
-                                prediction.predictedTrafficLevel ||
-                                "UNKNOWN"
-                            )}
+                            ${this.escapeHtml(prediction.predictedTrafficLevel || "UNKNOWN")}
                         </h4>
-
                     </div>
-
                     <span class="prediction-model">
-                        ${this.escapeHtml(
-                            prediction.modelVersion || "UNKNOWN"
-                        )}
+                        ${this.escapeHtml(prediction.modelVersion || "UNKNOWN")}
                     </span>
-
                 </div>
-
                 <div class="prediction-card-grid">
-
                     <div class="prediction-metric">
                         <span>VEHICLES</span>
                         <strong>
-                            ${
-                                prediction.predictedVehicleCount !== null &&
-                                prediction.predictedVehicleCount !== undefined
-                                    ? Number(
-                                        prediction.predictedVehicleCount
-                                    ).toLocaleString()
-                                    : "N/A"
-                            }
+                            ${prediction.predictedVehicleCount !== null &&
+                              prediction.predictedVehicleCount !== undefined
+                                ? Number(prediction.predictedVehicleCount).toLocaleString()
+                                : "N/A"}
                         </strong>
                     </div>
-
                     <div class="prediction-metric">
                         <span>AVG SPEED</span>
-                        <strong>
-                            ${this.formatPredictionNumber(
-                                prediction.predictedAverageSpeed
-                            )} km/h
-                        </strong>
+                        <strong>${this.formatPredictionNumber(prediction.predictedAverageSpeed)} km/h</strong>
                     </div>
-
                     <div class="prediction-metric">
                         <span>DENSITY</span>
-                        <strong>
-                            ${this.formatPredictionNumber(
-                                prediction.predictedDensity
-                            )}%
-                        </strong>
+                        <strong>${this.formatPredictionNumber(prediction.predictedDensity)}%</strong>
                     </div>
-
                     <div class="prediction-metric">
                         <span>CONGESTION</span>
-                        <strong>
-                            ${this.formatPredictionNumber(
-                                prediction.predictedCongestionScore
-                            )}
-                        </strong>
+                        <strong>${this.formatPredictionNumber(prediction.predictedCongestionScore)}</strong>
                     </div>
-
                     <div class="prediction-metric">
                         <span>CONFIDENCE</span>
-                        <strong>
-                            ${this.formatPredictionNumber(
-                                prediction.confidenceScore
-                            )}%
-                        </strong>
+                        <strong>${this.formatPredictionNumber(prediction.confidenceScore)}%</strong>
                     </div>
-
                 </div>
-
             </div>
         `;
 
@@ -1638,9 +1618,7 @@ const CityPulseApp = {
         }
 
         const number = Number(value);
-
         if (!Number.isFinite(number)) return "N/A";
-
         return number.toFixed(decimals);
 
     },
@@ -1648,15 +1626,11 @@ const CityPulseApp = {
 
     showPredictionMessage(message, type = "info") {
 
-        const element =
-            document.getElementById("prediction-analysis-message");
-
+        const element = document.getElementById("prediction-analysis-message");
         if (!element) return;
 
         element.textContent = message;
-
         element.className = `analysis-message ${type}`;
-
         element.style.display = "block";
 
     },
@@ -1664,34 +1638,28 @@ const CityPulseApp = {
 
     clearPredictionResults() {
 
-        const result =
-            document.getElementById("prediction-results");
-
+        const result = document.getElementById("prediction-results");
         if (result) result.innerHTML = "";
 
-        const empty =
-            document.getElementById("prediction-empty-state");
-
+        const empty = document.getElementById("prediction-empty-state");
         if (empty) empty.style.display = "block";
 
         this.renderPredictionCurrentTraffic(null);
-
         this.renderPredictionWeather(null);
 
     },
 
 
+    /* ============================================
+       ANALYTICS — MAIN STATS
+    ============================================ */
+
     setupAnalyticsControls() {
 
-        const button =
-            document.getElementById("refresh-analytics-button");
-
+        const button = document.getElementById("refresh-analytics-button");
         if (!button) return;
 
-        button.addEventListener(
-            "click",
-            () => this.loadAnalyticsPage()
-        );
+        button.addEventListener("click", () => this.loadAnalyticsPage());
 
     },
 
@@ -1706,9 +1674,7 @@ const CityPulseApp = {
             );
 
             const analytics =
-                await this.apiRequest(
-                    "/api/traffic/analytics/historical"
-                );
+                await this.apiRequest("/api/traffic/analytics/historical");
 
             this.renderAnalytics(analytics);
 
@@ -1720,9 +1686,7 @@ const CityPulseApp = {
         } catch (error) {
 
             console.error("Analytics loading failed:", error);
-
             this.clearAnalyticsResults();
-
             this.showAnalyticsMessage(
                 "Unable to load Traffic Analytics.",
                 "error"
@@ -1739,44 +1703,32 @@ const CityPulseApp = {
 
             "analytics-total-records":
                 this.formatNumber(analytics?.totalRecords),
-
             "analytics-average-vehicles":
                 this.formatNumber(analytics?.averageVehicleCount),
-
             "analytics-average-speed":
                 `${this.formatNumber(analytics?.averageSpeed)} km/h`,
-
             "analytics-average-density":
                 `${this.formatNumber(analytics?.averageDensity)}%`,
-
             "analytics-average-congestion":
                 this.formatNumber(analytics?.averageCongestionScore),
-
             "analytics-min-speed":
                 `${this.formatNumber(analytics?.minimumSpeed)} km/h`,
-
             "analytics-max-speed":
                 `${this.formatNumber(analytics?.maximumSpeed)} km/h`,
-
             "analytics-min-density":
                 `${this.formatNumber(analytics?.minimumDensity)}%`,
-
             "analytics-max-density":
                 `${this.formatNumber(analytics?.maximumDensity)}%`,
-
             "analytics-analysis-start":
                 this.formatDateTime(analytics?.analysisStart),
-
             "analytics-analysis-end":
                 this.formatDateTime(analytics?.analysisEnd)
 
         };
 
-
         Object.entries(values).forEach(([id, value]) => {
             this.setElementText(id, value);
         });
-
 
         this.renderAnalyticsDistribution(
             analytics?.trafficLevelDistribution
@@ -1787,70 +1739,43 @@ const CityPulseApp = {
 
     renderAnalyticsDistribution(distribution) {
 
-        const container =
-            document.getElementById("analytics-traffic-distribution");
-
+        const container = document.getElementById("analytics-traffic-distribution");
         if (!container) return;
 
         const entries = Object.entries(distribution || {});
 
-
         if (entries.length === 0) {
-
             container.innerHTML = `
                 <div class="analytics-distribution-empty">
                     No traffic-level distribution data available.
                 </div>
             `;
-
             return;
-
         }
 
-
-        const total =
-            entries.reduce(
-                (sum, item) => sum + Number(item[1] || 0),
-                0
-            );
-
+        const total = entries.reduce(
+            (sum, item) => sum + Number(item[1] || 0),
+            0
+        );
 
         container.innerHTML =
             entries.map(([level, count]) => {
 
                 const percentage =
-                    total > 0
-                        ? (Number(count) / total) * 100
-                        : 0;
+                    total > 0 ? (Number(count) / total) * 100 : 0;
 
                 return `
                     <div class="analytics-distribution-row">
-
                         <div class="analytics-distribution-header">
-                            <span>
-                                ${this.escapeHtml(
-                                    String(level).toUpperCase()
-                                )}
-                            </span>
-                            <span>
-                                ${this.formatNumber(count)}
-                            </span>
+                            <span>${this.escapeHtml(String(level).toUpperCase())}</span>
+                            <span>${this.formatNumber(count)}</span>
                         </div>
-
                         <div class="analytics-distribution-track">
-                            <div
-                                class="analytics-distribution-fill"
-                                style="width:${Math.max(
-                                    0,
-                                    Math.min(100, percentage)
-                                )}%;">
+                            <div class="analytics-distribution-fill"
+                                 style="width:${Math.max(0, Math.min(100, percentage))}%;">
                             </div>
                         </div>
-
-                        <span>
-                            ${this.formatNumber(percentage)}%
-                        </span>
-
+                        <span>${this.formatNumber(percentage)}%</span>
                     </div>
                 `;
 
@@ -1861,15 +1786,11 @@ const CityPulseApp = {
 
     showAnalyticsMessage(message, type = "info") {
 
-        const element =
-            document.getElementById("analytics-analysis-message");
-
+        const element = document.getElementById("analytics-analysis-message");
         if (!element) return;
 
         element.textContent = message;
-
         element.className = `analysis-message ${type}`;
-
         element.style.display = "block";
 
     },
@@ -1891,7 +1812,6 @@ const CityPulseApp = {
             "analytics-analysis-end"
         ].forEach(id => this.setElementText(id, "—"));
 
-
         const distribution =
             document.getElementById("analytics-traffic-distribution");
 
@@ -1900,17 +1820,223 @@ const CityPulseApp = {
     },
 
 
+    /* ============================================
+       ANALYTICS — TRAFFIC TREND CHART
+    ============================================ */
+
+    setupTrendChartControls() {
+
+        const roadSelect = document.getElementById("trend-road-select");
+        const refreshButton = document.getElementById("refresh-trend-chart-button");
+
+        if (roadSelect) {
+            roadSelect.addEventListener("change", () => {
+                const roadId = roadSelect.value;
+                if (roadId) {
+                    this.loadTrafficTrendChart(Number(roadId));
+                }
+            });
+        }
+
+        if (refreshButton) {
+            refreshButton.addEventListener("click", () => {
+                const select = document.getElementById("trend-road-select");
+                const roadId = select?.value;
+                if (roadId) {
+                    this.loadTrafficTrendChart(Number(roadId));
+                }
+            });
+        }
+
+    },
+
+
+    async loadTrendChartPage() {
+
+        const roadSelect = document.getElementById("trend-road-select");
+        if (!roadSelect) return;
+
+        try {
+
+            if (this.roads.length === 0) {
+                await this.loadRoads();
+            }
+
+            const current = roadSelect.value;
+            roadSelect.innerHTML = `<option value="">Select road</option>`;
+
+            this.roads.forEach(road => {
+                const option = document.createElement("option");
+                option.value = String(road.id);
+                option.textContent = road.name || `Road ${road.id}`;
+                roadSelect.appendChild(option);
+            });
+
+            if (current) {
+                roadSelect.value = current;
+            }
+
+            if (!roadSelect.value && this.roads.length > 0) {
+                roadSelect.value = String(this.roads[0].id);
+            }
+
+            if (roadSelect.value) {
+                await this.loadTrafficTrendChart(Number(roadSelect.value));
+            }
+
+        } catch (error) {
+            console.error("Trend chart page loading failed:", error);
+        }
+
+    },
+
+
+    async loadTrafficTrendChart(roadId) {
+
+        const canvas = document.getElementById("traffic-trend-chart");
+        const insight = document.getElementById("trend-chart-insight");
+
+        if (!canvas) return;
+
+        if (typeof Chart === "undefined") {
+            console.warn("Chart.js is not available.");
+            return;
+        }
+
+        try {
+
+            const data = await this.apiRequest(
+                `/api/traffic/analytics/hourly/${roadId}`
+            );
+
+            this.trendChartRoadId = roadId;
+
+            const pattern = Array.isArray(data?.hourlyPattern)
+                ? data.hourlyPattern
+                : [];
+
+            const labels = pattern.map(row => {
+                const h = row.hour;
+                return `${String(h).padStart(2, "0")}:00`;
+            });
+
+            const values = pattern.map(row =>
+                row.avgCongestion !== null ? row.avgCongestion : null
+            );
+
+            if (this.trafficTrendChart) {
+                this.trafficTrendChart.destroy();
+            }
+
+            const ctx = canvas.getContext("2d");
+
+            this.trafficTrendChart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "Avg Congestion Score",
+                        data: values,
+                        borderColor: "#0ea5e9",
+                        backgroundColor: "rgba(14, 165, 233, 0.15)",
+                        borderWidth: 3,
+                        pointBackgroundColor: "#0ea5e9",
+                        pointBorderColor: "#ffffff",
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        spanGaps: true,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const v = context.parsed.y;
+                                    return v !== null
+                                        ? `Congestion: ${v}`
+                                        : "No data";
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                color: "#94a3b8",
+                                stepSize: 25
+                            },
+                            grid: {
+                                color: "rgba(148, 163, 184, 0.1)"
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: "#94a3b8",
+                                maxRotation: 0,
+                                autoSkip: false,
+                                font: { size: 10 }
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            if (insight) {
+
+                if (!data || data.dataStatus === "UNAVAILABLE") {
+                    insight.innerHTML =
+                        `No traffic records available for this road yet.`;
+                    return;
+                }
+
+                const peakHour = data.peakHour;
+                const peakCong = data.peakCongestion;
+                const quietHour = data.quietestHour;
+                const quietCong = data.quietestCongestion;
+
+                if (peakHour !== null && quietHour !== null) {
+                    insight.innerHTML =
+                        `<strong>${this.escapeHtml(data.roadName)}</strong> — ` +
+                        `Best time: <span style="color:#22c55e;font-weight:600;">${String(quietHour).padStart(2, "0")}:00 (${quietCong})</span> • ` +
+                        `Avoid: <span style="color:#ef4444;font-weight:600;">${String(peakHour).padStart(2, "0")}:00 (${peakCong})</span> • ` +
+                        `${data.totalRecords} records analyzed.`;
+                } else {
+                    insight.innerHTML =
+                        `<strong>${this.escapeHtml(data.roadName)}</strong> — ` +
+                        `${data.totalRecords} records analyzed. Peak/quiet hours not yet available.`;
+                }
+            }
+
+        } catch (error) {
+            console.error("Trend chart loading failed:", error);
+            if (insight) {
+                insight.innerHTML =
+                    `Unable to load hourly traffic data for this road.`;
+            }
+        }
+
+    },
+
+
+    /* ============================================
+       ALERTS
+    ============================================ */
+
     setupAlertControls() {
 
-        const button =
-            document.getElementById("refresh-alerts-button");
-
+        const button = document.getElementById("refresh-alerts-button");
         if (!button) return;
 
-        button.addEventListener(
-            "click",
-            () => this.loadAlertsPage()
-        );
+        button.addEventListener("click", () => this.loadAlertsPage());
 
     },
 
@@ -1919,15 +2045,10 @@ const CityPulseApp = {
 
         try {
 
-            this.showAlertsMessage(
-                "Loading Smart Alerts...",
-                "info"
-            );
+            this.showAlertsMessage("Loading Smart Alerts...", "info");
 
             const alerts = await this.apiRequest("/api/alerts");
-
-            const safeAlerts =
-                Array.isArray(alerts) ? alerts : [];
+            const safeAlerts = Array.isArray(alerts) ? alerts : [];
 
             this.renderAlerts(safeAlerts);
 
@@ -1939,9 +2060,7 @@ const CityPulseApp = {
         } catch (error) {
 
             console.error("Smart Alerts loading failed:", error);
-
             this.clearAlertsResults();
-
             this.showAlertsMessage(
                 "Unable to load Smart Alerts.",
                 "error"
@@ -1955,147 +2074,95 @@ const CityPulseApp = {
     renderAlerts(alerts) {
 
         const list = document.getElementById("alerts-list");
-
         const empty = document.getElementById("alerts-empty-state");
 
         if (!list) return;
 
-
         const safeAlerts = Array.isArray(alerts) ? alerts : [];
 
-        const critical =
-            safeAlerts.filter(alert =>
-                String(alert?.severity || "").toUpperCase() === "CRITICAL"
-            ).length;
+        const critical = safeAlerts.filter(alert =>
+            String(alert?.severity || "").toUpperCase() === "CRITICAL"
+        ).length;
 
-        const high =
-            safeAlerts.filter(alert =>
-                String(alert?.severity || "").toUpperCase() === "HIGH"
-            ).length;
+        const high = safeAlerts.filter(alert =>
+            String(alert?.severity || "").toUpperCase() === "HIGH"
+        ).length;
 
-        const active =
-            safeAlerts.filter(alert => alert?.active === true).length;
-
+        const active = safeAlerts.filter(alert => alert?.active === true).length;
 
         this.setElementText("alerts-total", safeAlerts.length);
-
         this.setElementText("alerts-critical", critical);
-
         this.setElementText("alerts-high", high);
-
         this.setElementText("alerts-active", active);
 
-
         if (safeAlerts.length === 0) {
-
             list.innerHTML = "";
-
             if (empty) empty.style.display = "block";
-
             return;
-
         }
 
         if (empty) empty.style.display = "none";
 
-
         list.innerHTML =
-            safeAlerts
-                .map(alert => this.renderAlertCard(alert))
-                .join("");
+            safeAlerts.map(alert => this.renderAlertCard(alert)).join("");
 
     },
 
 
     renderAlertCard(alert) {
 
-        const severity =
-            String(alert?.severity || "UNKNOWN").toUpperCase();
-
+        const severity = String(alert?.severity || "UNKNOWN").toUpperCase();
 
         return `
             <article class="alert-card">
-
                 <div class="alert-card-header">
-
                     <div>
-
                         <span class="alert-type">
-                            ${this.escapeHtml(
-                                String(
-                                    alert?.alertType || "ALERT"
-                                ).toUpperCase()
-                            )}
+                            ${this.escapeHtml(String(alert?.alertType || "ALERT").toUpperCase())}
                         </span>
-
                         <h4 class="alert-card-title">
-                            ${this.escapeHtml(
-                                alert?.title || "Traffic Alert"
-                            )}
+                            ${this.escapeHtml(alert?.title || "Traffic Alert")}
                         </h4>
-
                     </div>
-
                     <span class="alert-severity alert-severity-${severity.toLowerCase()}">
                         ${this.escapeHtml(severity)}
                     </span>
-
                 </div>
-
                 <p class="alert-card-message">
-                    ${this.escapeHtml(
-                        alert?.message ||
-                        "No alert details available."
-                    )}
+                    ${this.escapeHtml(alert?.message || "No alert details available.")}
                 </p>
-
                 <div class="alert-card-details">
-
                     <div>
                         <span class="alert-detail-label">Road</span>
                         <span class="alert-detail-value">
-                            ${this.escapeHtml(
-                                alert?.road?.name || "Unavailable"
-                            )}
+                            ${this.escapeHtml(alert?.road?.name || "Unavailable")}
                         </span>
                     </div>
-
                     <div>
                         <span class="alert-detail-label">Location</span>
                         <span class="alert-detail-value">
-                            ${this.escapeHtml(
-                                alert?.location?.name || "Unavailable"
-                            )}
+                            ${this.escapeHtml(alert?.location?.name || "Unavailable")}
                         </span>
                     </div>
-
                     <div>
                         <span class="alert-detail-label">Status</span>
                         <span class="alert-detail-value">
                             ${alert?.active === true ? "ACTIVE" : "INACTIVE"}
                         </span>
                     </div>
-
                     <div>
                         <span class="alert-detail-label">Created</span>
                         <span class="alert-detail-value">
-                            ${this.escapeHtml(
-                                this.formatDateTime(alert?.createdAt)
-                            )}
+                            ${this.escapeHtml(this.formatDateTime(alert?.createdAt))}
                         </span>
                     </div>
-
                     <div>
                         <span class="alert-detail-label">Expires</span>
                         <span class="alert-detail-value">
-                            ${this.escapeHtml(
-                                this.formatDateTime(alert?.expiresAt)
-                            )}
+                            ${this.escapeHtml(this.formatDateTime(alert?.expiresAt))}
                         </span>
                     </div>
-
                 </div>
-
             </article>
         `;
 
@@ -2104,15 +2171,11 @@ const CityPulseApp = {
 
     showAlertsMessage(message, type = "info") {
 
-        const element =
-            document.getElementById("alerts-analysis-message");
-
+        const element = document.getElementById("alerts-analysis-message");
         if (!element) return;
 
         element.textContent = message;
-
         element.className = `analysis-message ${type}`;
-
         element.style.display = "block";
 
     },
@@ -2121,27 +2184,32 @@ const CityPulseApp = {
     clearAlertsResults() {
 
         const list = document.getElementById("alerts-list");
-
         const empty = document.getElementById("alerts-empty-state");
 
         if (list) list.innerHTML = "";
-
         if (empty) empty.style.display = "none";
 
     },
 
 
+    /* ============================================
+       SMART ROUTES
+    ============================================ */
+
     setupRouteControls() {
 
-        const button =
-            document.getElementById("find-routes-button");
+        const button = document.getElementById("find-routes-button");
+        if (button) {
+            button.addEventListener("click", () => this.findSmartRoutes());
+        }
 
-        if (!button) return;
-
-        button.addEventListener(
-            "click",
-            () => this.findSmartRoutes()
-        );
+        const refreshSaved = document.getElementById("refresh-saved-routes-button");
+        if (refreshSaved) {
+            refreshSaved.addEventListener("click", () => {
+                this.loadSavedRoutes();
+                this.loadFavoriteRoads();
+            });
+        }
 
     },
 
@@ -2155,8 +2223,10 @@ const CityPulseApp = {
             }
 
             this.populateRouteLocationSelects();
-
             this.clearRouteResults();
+
+            await this.loadSavedRoutes();
+            await this.loadFavoriteRoads();
 
         } catch (error) {
 
@@ -2169,14 +2239,10 @@ const CityPulseApp = {
 
     populateRouteLocationSelects() {
 
-        const start =
-            document.getElementById("route-start-location");
-
-        const destination =
-            document.getElementById("route-destination-location");
+        const start = document.getElementById("route-start-location");
+        const destination = document.getElementById("route-destination-location");
 
         if (!start || !destination) return;
-
 
         const options = placeholder => {
 
@@ -2185,22 +2251,18 @@ const CityPulseApp = {
             this.locations
                 .filter(location => location.active !== false)
                 .forEach(location => {
-
                     html += `
                         <option value="${location.id}">
                             ${this.escapeHtml(location.name)}
                         </option>
                     `;
-
                 });
 
             return html;
 
         };
 
-
         start.innerHTML = options("Select start location");
-
         destination.innerHTML = options("Select destination");
 
     },
@@ -2208,38 +2270,25 @@ const CityPulseApp = {
 
     async findSmartRoutes() {
 
-        const start =
-            document.getElementById("route-start-location")?.value;
-
-        const destination =
-            document.getElementById("route-destination-location")?.value;
-
-        const button =
-            document.getElementById("find-routes-button");
-
+        const start = document.getElementById("route-start-location")?.value;
+        const destination = document.getElementById("route-destination-location")?.value;
+        const button = document.getElementById("find-routes-button");
 
         if (!start || !destination) {
-
             this.showRouteMessage(
                 "Please select both start and destination locations.",
                 "error"
             );
-
             return;
-
         }
 
         if (start === destination) {
-
             this.showRouteMessage(
                 "Start and destination locations must be different.",
                 "error"
             );
-
             return;
-
         }
-
 
         try {
 
@@ -2248,51 +2297,46 @@ const CityPulseApp = {
                 button.textContent = "Analyzing...";
             }
 
-            this.showRouteMessage(
-                "Analyzing traffic-aware routes...",
-                "info"
-            );
+            this.showRouteMessage("Analyzing traffic-aware routes...", "info");
 
-
-            const data =
-                await this.apiRequest(
-                    "/api/worldwide-routes/traffic-route",
-                    {
-                        method: "POST",
-                        body: {
-                            fromAddress:
-                                this.getLocationAddress(Number(start)),
-                            toAddress:
-                                this.getLocationAddress(Number(destination))
-                        }
+            const data = await this.apiRequest(
+                "/api/worldwide-routes/traffic-route",
+                {
+                    method: "POST",
+                    body: {
+                        fromAddress: this.getLocationAddress(Number(start)),
+                        toAddress: this.getLocationAddress(Number(destination))
                     }
-                );
-
+                }
+            );
 
             this.routeResults =
                 Array.isArray(data)
                     ? data
                     : (
-                        Array.isArray(data?.routes)
-                            ? data.routes
-                            : []
+                        Array.isArray(data?.trafficAnalysis)
+                            ? data.trafficAnalysis
+                            : (
+                                Array.isArray(data?.routes)
+                                    ? data.routes
+                                    : []
+                            )
                     );
-
 
             this.renderSmartRouteResults(this.routeResults);
 
             this.showRouteMessage(
-                "Traffic-aware route analysis completed.",
-                "success"
+                this.routeResults.length > 0
+                    ? "Traffic-aware route analysis completed."
+                    : "No routes were returned for this journey.",
+                this.routeResults.length > 0 ? "success" : "info"
             );
 
         } catch (error) {
 
             console.error("Smart route analysis failed:", error);
-
             this.showRouteMessage(
-                error.message ||
-                "Unable to analyze smart routes.",
+                error.message || "Unable to analyze smart routes.",
                 "error"
             );
 
@@ -2311,7 +2355,6 @@ const CityPulseApp = {
     getLocationAddress(locationId) {
 
         const location = this.findLocation(locationId);
-
         if (!location) return String(locationId);
 
         return [
@@ -2326,27 +2369,28 @@ const CityPulseApp = {
 
     renderSmartRouteResults(routes) {
 
-        const container =
-            document.getElementById("routes-results");
-
-        const empty =
-            document.getElementById("routes-empty-state");
+        const container = document.getElementById("routes-results");
+        const empty = document.getElementById("routes-empty-state");
+        const resultsPanel = document.getElementById("route-results-panel");
 
         if (!container) return;
 
-
         if (!routes || routes.length === 0) {
-
             container.innerHTML = "";
-
+            if (resultsPanel) resultsPanel.style.display = "none";
             if (empty) empty.style.display = "block";
-
             return;
-
         }
 
         if (empty) empty.style.display = "none";
+        if (resultsPanel) resultsPanel.style.display = "block";
 
+        const resultCount = document.getElementById("route-result-count");
+
+        if (resultCount) {
+            resultCount.textContent =
+                `${routes.length} ROUTE${routes.length > 1 ? "S" : ""}`;
+        }
 
         container.innerHTML =
             routes.map((route, index) => {
@@ -2355,102 +2399,59 @@ const CityPulseApp = {
 
                 return `
                     <article class="route-result-card">
-
                         <div class="route-result-header">
-
                             <div>
-
-                                <span class="section-label">
-                                    ROUTE ${index + 1}
-                                </span>
-
+                                <span class="section-label">ROUTE ${index + 1}</span>
                                 <h4>
-                                    ${this.escapeHtml(
-                                        route.routeName ||
-                                        route.routeId ||
-                                        `Route ${index + 1}`
-                                    )}
+                                    ${this.escapeHtml(route.routeName || route.routeId || `Route ${index + 1}`)}
                                 </h4>
-
                             </div>
-
-                            ${
-                                recommended
-                                    ? `<span class="route-recommended-badge">
-                                            RECOMMENDED
-                                       </span>`
-                                    : ""
-                            }
-
+                            ${recommended ? `<span class="route-recommended-badge">RECOMMENDED</span>` : ""}
                         </div>
-
                         <div class="route-result-grid">
-
                             <div>
                                 <span>DISTANCE</span>
-                                <strong>
-                                    ${this.formatNumber(
-                                        route.distanceKm, 2
-                                    )} km
-                                </strong>
+                                <strong>${this.formatNumber(route.distanceKm, 2)} km</strong>
                             </div>
-
                             <div>
                                 <span>TIME</span>
-                                <strong>
-                                    ${this.formatNumber(
-                                        route.estimatedTimeMinutes, 2
-                                    )} min
-                                </strong>
+                                <strong>${this.formatNumber(route.timeMinutes || route.estimatedTimeMinutes, 2)} min</strong>
                             </div>
-
                             <div>
                                 <span>CURRENT TRAFFIC</span>
-                                <strong>
-                                    ${this.escapeHtml(
-                                        route.currentTrafficLevel ||
-                                        "UNKNOWN"
-                                    )}
-                                </strong>
+                                <strong>${this.escapeHtml(route.trafficLevel || route.currentTrafficLevel || "UNAVAILABLE")}</strong>
                             </div>
-
                             <div>
-                                <span>PREDICTED TRAFFIC</span>
-                                <strong>
-                                    ${this.escapeHtml(
-                                        route.predictedTrafficLevel ||
-                                        "UNKNOWN"
-                                    )}
-                                </strong>
+                                <span>TRAFFIC DATA</span>
+                                <strong>${this.escapeHtml(route.trafficDataStatus || "—")}</strong>
                             </div>
-
                             <div>
                                 <span>CONGESTION</span>
-                                <strong>
-                                    ${this.formatNumber(
-                                        route.congestionScore
-                                    )}
-                                </strong>
+                                <strong>${this.formatNumber(route.weightedCongestionScore || route.congestionScore)}</strong>
                             </div>
-
                             <div>
                                 <span>ROUTE SCORE</span>
-                                <strong>
-                                    ${this.formatNumber(
-                                        route.routeScore
-                                    )}
-                                </strong>
+                                <strong>${this.formatNumber(route.routeScore)}</strong>
                             </div>
-
                         </div>
-
-                        <p>
-                            ${this.escapeHtml(
-                                route.recommendationReason ||
-                                "Traffic-aware route analyzed by CityPulse."
-                            )}
-                        </p>
-
+                        ${route.weatherBadge
+                            ? `<div class="weather-badge" title="${this.escapeHtml(route.weatherCondition || '')}">${this.escapeHtml(route.weatherBadge)}</div>`
+                            : ""}
+                        <p>${this.escapeHtml(route.recommendationReason || "Traffic-aware route analyzed by CityPulse.")}</p>
+                        <button
+                            type="button"
+                            onclick="CityPulseApp.saveCurrentRoute(${index})"
+                            style="margin-top: 12px;
+                                   padding: 8px 14px;
+                                   background: #0ea5e9;
+                                   color: white;
+                                   border: none;
+                                   border-radius: 6px;
+                                   font-size: 13px;
+                                   font-weight: 600;
+                                   cursor: pointer;">
+                            ⭐ Save This Route
+                        </button>
                     </article>
                 `;
 
@@ -2461,52 +2462,365 @@ const CityPulseApp = {
 
     showRouteMessage(message, type = "info") {
 
-        const element =
-            document.getElementById("route-analysis-message");
-
+        const element = document.getElementById("route-analysis-message");
         if (!element) return;
 
         element.textContent = message;
-
         element.className = "route-message";
-
         element.classList.add(`route-message-${type}`);
+        element.style.display = "block";
 
     },
 
 
     clearRouteResults() {
 
-        const container =
-            document.getElementById("routes-results");
-
+        const container = document.getElementById("routes-results");
         if (container) container.innerHTML = "";
 
-        const empty =
-            document.getElementById("routes-empty-state");
+        const empty = document.getElementById("routes-empty-state");
+        if (empty) empty.style.display = "none";
 
-        if (empty) empty.style.display = "block";
+        const resultsPanel = document.getElementById("route-results-panel");
+        if (resultsPanel) resultsPanel.style.display = "none";
 
     },
 
 
+    async saveCurrentRoute(routeIndex) {
+
+        const route = this.routeResults[routeIndex];
+        if (!route) return;
+
+        const fromId = document.getElementById("route-start-location")?.value;
+        const toId = document.getElementById("route-destination-location")?.value;
+
+        const fromName = this.findLocation(Number(fromId))?.name || "Start";
+        const toName = this.findLocation(Number(toId))?.name || "End";
+
+        const defaultName = `${fromName} → ${toName}`;
+        const routeName = prompt("Name this route:", defaultName);
+        if (!routeName) return;
+
+        try {
+
+            await this.apiRequest("/api/saved-routes", {
+                method: "POST",
+                body: {
+                    routeName: routeName.trim(),
+                    fromLocationId: fromId ? Number(fromId) : null,
+                    fromLocationName: fromName,
+                    toLocationId: toId ? Number(toId) : null,
+                    toLocationName: toName,
+                    distanceKm: route.distanceKm || null,
+                    estimatedMinutes:
+                        route.timeMinutes || route.estimatedTimeMinutes || null,
+                    trafficLevelAtSave:
+                        route.trafficLevel || route.currentTrafficLevel || null
+                }
+            });
+
+            this.showRouteMessage(
+                `Route saved: "${routeName.trim()}"`,
+                "success"
+            );
+
+            await this.loadSavedRoutes();
+
+        } catch (error) {
+
+            console.error("Save route failed:", error);
+            this.showRouteMessage(
+                error.message || "Could not save route.",
+                "error"
+            );
+
+        }
+
+    },
+
+
+    async loadSavedRoutes() {
+
+        const list = document.getElementById("saved-routes-list");
+        const empty = document.getElementById("saved-routes-empty");
+        if (!list) return;
+
+        if (!this.authToken) {
+            list.innerHTML = "";
+            if (empty) empty.style.display = "block";
+            return;
+        }
+
+        try {
+
+            const routes = await this.apiRequest("/api/saved-routes");
+            const safeRoutes = Array.isArray(routes) ? routes : [];
+
+            if (safeRoutes.length === 0) {
+                list.innerHTML = "";
+                if (empty) empty.style.display = "block";
+                return;
+            }
+
+            if (empty) empty.style.display = "none";
+
+            list.innerHTML =
+                safeRoutes.map(route => `
+                    <article style="background: #0f172a;
+                                    padding: 16px;
+                                    border-radius: 8px;
+                                    border-left: 3px solid #0ea5e9;">
+                        <div style="color: #f1f5f9;
+                                    font-size: 15px;
+                                    font-weight: 600;
+                                    margin-bottom: 8px;">
+                            ⭐ ${this.escapeHtml(route.routeName || "Untitled")}
+                        </div>
+                        <div style="color: #94a3b8; font-size: 13px;">
+                            <div>${this.escapeHtml(route.fromLocationName || "?")} → ${this.escapeHtml(route.toLocationName || "?")}</div>
+                            <div style="margin-top: 4px;">
+                                ${this.formatNumber(route.distanceKm, 2)} km
+                                &nbsp;•&nbsp;
+                                ${this.formatNumber(route.estimatedMinutes, 0)} min
+                                ${route.trafficLevelAtSave ? `&nbsp;•&nbsp; ${this.escapeHtml(route.trafficLevelAtSave)}` : ""}
+                            </div>
+                            <div style="margin-top: 6px; font-size: 11px; color: #64748b;">
+                                Saved ${this.formatDateTime(route.createdAt)}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button
+                                onclick="CityPulseApp.loadSavedRoute(${route.id})"
+                                style="flex: 1;
+                                       padding: 6px 10px;
+                                       background: #0ea5e9;
+                                       color: white;
+                                       border: none;
+                                       border-radius: 4px;
+                                       font-size: 12px;
+                                       cursor: pointer;">
+                                Load
+                            </button>
+                            <button
+                                onclick="CityPulseApp.deleteSavedRoute(${route.id})"
+                                style="flex: 1;
+                                       padding: 6px 10px;
+                                       background: #dc2626;
+                                       color: white;
+                                       border: none;
+                                       border-radius: 4px;
+                                       font-size: 12px;
+                                       cursor: pointer;">
+                                🗑 Delete
+                            </button>
+                        </div>
+                    </article>
+                `).join("");
+
+        } catch (error) {
+
+            console.error("Load saved routes failed:", error);
+            list.innerHTML =
+                `<div style="grid-column: 1 / -1; color: #f87171; padding: 12px;">Unable to load saved routes.</div>`;
+
+        }
+
+    },
+
+
+    async loadSavedRoute(routeId) {
+
+        try {
+
+            const route = await this.apiRequest(`/api/saved-routes/${routeId}`);
+            if (!route) return;
+
+            const startSelect = document.getElementById("route-start-location");
+            const endSelect = document.getElementById("route-destination-location");
+
+            if (startSelect && route.fromLocationId) {
+                startSelect.value = String(route.fromLocationId);
+            }
+            if (endSelect && route.toLocationId) {
+                endSelect.value = String(route.toLocationId);
+            }
+
+            this.showRouteMessage(
+                `Loaded saved route "${route.routeName}" — click Find Smart Routes to recalculate.`,
+                "info"
+            );
+
+            this.showSection("routes");
+
+        } catch (error) {
+
+            console.error("Load saved route failed:", error);
+
+        }
+
+    },
+
+
+    async deleteSavedRoute(routeId) {
+
+        if (!confirm("Delete this saved route?")) return;
+
+        try {
+
+            await this.apiRequest(`/api/saved-routes/${routeId}`, {
+                method: "DELETE"
+            });
+
+            await this.loadSavedRoutes();
+
+        } catch (error) {
+
+            console.error("Delete route failed:", error);
+
+        }
+
+    },
+
+
+    async toggleFavoriteRoad(roadId) {
+
+        const numericRoadId = Number(roadId);
+
+        if (!Number.isFinite(numericRoadId) || numericRoadId <= 0) {
+            console.warn("toggleFavoriteRoad called with invalid roadId:", roadId);
+            return;
+        }
+
+        if (!this.authToken) {
+            alert("Please log in to favorite roads.");
+            return;
+        }
+
+        try {
+
+            const check = await this.apiRequest(
+                `/api/favorite-roads/check/${numericRoadId}`
+            );
+            const isFav = check?.favorited === true;
+
+            if (isFav) {
+                await this.apiRequest(
+                    `/api/favorite-roads/${numericRoadId}`,
+                    { method: "DELETE" }
+                );
+                this.favoriteRoadIds.delete(numericRoadId);
+            } else {
+
+                const road = this.findRoad(numericRoadId);
+                await this.apiRequest("/api/favorite-roads", {
+                    method: "POST",
+                    body: {
+                        roadId: numericRoadId,
+                        roadName: road?.name || `Road ${numericRoadId}`,
+                        roadCode: road?.roadCode || null
+                    }
+                });
+                this.favoriteRoadIds.add(numericRoadId);
+            }
+
+            await this.loadFavoriteRoads();
+            this.updateTrafficOverview();
+            this.renderLiveTrafficTable();
+
+        } catch (error) {
+
+            console.error("Toggle favorite failed:", error);
+
+        }
+
+    },
+
+
+    async loadFavoriteRoads() {
+
+        const list = document.getElementById("favorite-roads-list");
+        const empty = document.getElementById("favorite-roads-empty");
+        if (!list) return;
+
+        if (!this.authToken) {
+            list.innerHTML = "";
+            if (empty) empty.style.display = "block";
+            return;
+        }
+
+        try {
+
+            const favorites = await this.apiRequest("/api/favorite-roads");
+            const safeFavs = Array.isArray(favorites) ? favorites : [];
+
+            this.favoriteRoadIds = new Set(
+                safeFavs
+                    .map(fav => Number(fav.roadId))
+                    .filter(id => Number.isFinite(id) && id > 0)
+            );
+
+            if (safeFavs.length === 0) {
+                list.innerHTML = "";
+                if (empty) empty.style.display = "block";
+                return;
+            }
+
+            if (empty) empty.style.display = "none";
+
+            list.innerHTML =
+                safeFavs.map(fav => `
+                    <article style="background: #0f172a;
+                                    padding: 14px;
+                                    border-radius: 8px;
+                                    border-left: 3px solid #f59e0b;">
+                        <div style="color: #f1f5f9;
+                                    font-size: 14px;
+                                    font-weight: 600;">
+                            ❤️ ${this.escapeHtml(fav.roadName || "Road")}
+                        </div>
+                        <div style="color: #64748b;
+                                    font-size: 11px;
+                                    margin-top: 4px;">
+                            ${this.escapeHtml(fav.roadCode || "")}
+                        </div>
+                        <button
+                            onclick="CityPulseApp.toggleFavoriteRoad(${Number(fav.roadId)})"
+                            style="margin-top: 10px;
+                                   padding: 5px 10px;
+                                   background: #dc2626;
+                                   color: white;
+                                   border: none;
+                                   border-radius: 4px;
+                                   font-size: 11px;
+                                   cursor: pointer;">
+                            Unfavorite
+                        </button>
+                    </article>
+                `).join("");
+
+        } catch (error) {
+
+            console.error("Load favorites failed:", error);
+
+        }
+
+    },
+
+
+    /* ============================================
+       CITIZEN REPORTS
+    ============================================ */
+
     setupCitizenReportControls() {
 
-        const form =
-            document.getElementById("citizen-report-form");
-
+        const form = document.getElementById("citizen-report-form");
         if (!form) return;
 
-        form.addEventListener(
-            "submit",
-            event => {
-
-                event.preventDefault();
-
-                this.submitCitizenReport();
-
-            }
-        );
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            this.submitCitizenReport();
+        });
 
     },
 
@@ -2515,16 +2829,10 @@ const CityPulseApp = {
 
         try {
 
-            if (this.roads.length === 0) {
-                await this.loadRoads();
-            }
-
-            if (this.locations.length === 0) {
-                await this.loadLocations();
-            }
+            if (this.roads.length === 0) await this.loadRoads();
+            if (this.locations.length === 0) await this.loadLocations();
 
             this.populateCitizenReportRoads();
-
             this.populateCitizenReportLocations();
 
             await this.loadCitizenReports();
@@ -2541,25 +2849,15 @@ const CityPulseApp = {
     populateCitizenReportRoads() {
 
         const select = document.getElementById("report-road");
-
         if (!select) return;
 
-        select.innerHTML = `
-            <option value="">
-                Select road
-            </option>
-        `;
+        select.innerHTML = `<option value="">Select road</option>`;
 
         this.roads.forEach(road => {
-
             const option = document.createElement("option");
-
             option.value = String(road.id);
-
             option.textContent = road.name;
-
             select.appendChild(option);
-
         });
 
     },
@@ -2568,25 +2866,15 @@ const CityPulseApp = {
     populateCitizenReportLocations() {
 
         const select = document.getElementById("report-location");
-
         if (!select) return;
 
-        select.innerHTML = `
-            <option value="">
-                Select location
-            </option>
-        `;
+        select.innerHTML = `<option value="">Select location</option>`;
 
         this.locations.forEach(location => {
-
             const option = document.createElement("option");
-
             option.value = String(location.id);
-
             option.textContent = location.name;
-
             select.appendChild(option);
-
         });
 
     },
@@ -2594,39 +2882,23 @@ const CityPulseApp = {
 
     async submitCitizenReport() {
 
-        const form =
-            document.getElementById("citizen-report-form");
-
+        const form = document.getElementById("citizen-report-form");
         if (!form) return;
 
-        const reportType =
-            document.getElementById("report-type")?.value;
-
-        const roadId =
-            document.getElementById("report-road")?.value;
-
-        const locationId =
-            document.getElementById("report-location")?.value;
-
-        const description =
-            document.getElementById("report-description")?.value;
-
+        const reportType = document.getElementById("report-type")?.value;
+        const roadId = document.getElementById("report-road")?.value;
+        const locationId = document.getElementById("report-location")?.value;
+        const description = document.getElementById("report-description")?.value;
 
         if (!reportType || !description) {
-
             this.showCitizenReportMessage(
                 "Please select a report type and enter a description.",
                 "error"
             );
-
             return;
-
         }
 
-
-        const button =
-            document.getElementById("submit-report-button");
-
+        const button = document.getElementById("submit-report-button");
 
         try {
 
@@ -2635,7 +2907,6 @@ const CityPulseApp = {
                 button.textContent = "Submitting...";
             }
 
-
             await this.apiRequest(
                 "/api/reports",
                 {
@@ -2643,8 +2914,7 @@ const CityPulseApp = {
                     body: {
                         userId: this.currentUserId,
                         roadId: roadId ? Number(roadId) : null,
-                        locationId:
-                            locationId ? Number(locationId) : null,
+                        locationId: locationId ? Number(locationId) : null,
                         reportType,
                         description,
                         status: "PENDING"
@@ -2652,23 +2922,19 @@ const CityPulseApp = {
                 }
             );
 
-
             this.showCitizenReportMessage(
                 "Traffic report submitted successfully and is now pending review.",
                 "success"
             );
 
             form.reset();
-
             await this.loadCitizenReports();
 
         } catch (error) {
 
             console.error("Citizen report submission failed:", error);
-
             this.showCitizenReportMessage(
-                error.message ||
-                "Unable to submit traffic report.",
+                error.message || "Unable to submit traffic report.",
                 "error"
             );
 
@@ -2688,14 +2954,11 @@ const CityPulseApp = {
 
         try {
 
-            const reports =
-                await this.apiRequest(
-                    `/api/reports/user/${this.currentUserId}`
-                );
+            const reports = await this.apiRequest(
+                `/api/reports/user/${this.currentUserId}`
+            );
 
-            this.citizenReports =
-                Array.isArray(reports) ? reports : [];
-
+            this.citizenReports = Array.isArray(reports) ? reports : [];
             this.renderCitizenReports();
 
         } catch (error) {
@@ -2709,155 +2972,196 @@ const CityPulseApp = {
 
     renderCitizenReports() {
 
-        const container =
-            document.getElementById("reports-list");
-
-        const empty =
-            document.getElementById("reports-empty-state");
+        const container = document.getElementById("reports-list");
+        const empty = document.getElementById("reports-empty-state");
 
         if (!container) return;
 
-
         if (this.citizenReports.length === 0) {
-
             container.innerHTML = "";
-
             if (empty) empty.style.display = "block";
-
             return;
-
         }
 
         if (empty) empty.style.display = "none";
 
+        const countElement = document.getElementById("reports-count");
+
+        if (countElement) {
+            countElement.textContent =
+                `${this.citizenReports.length} REPORT${this.citizenReports.length > 1 ? "S" : ""}`;
+        }
 
         container.innerHTML =
-            this.citizenReports.map(report => `
+            this.citizenReports.map(report => {
+
+                const status =
+                    String(report.status || "PENDING").toUpperCase();
+
+                const isPending = status === "PENDING";
+
+                const statusClass =
+                    status === "APPROVED" ? "color: #22c55e; font-weight: 600;" :
+                    status === "REJECTED" ? "color: #ef4444; font-weight: 600;" :
+                    status === "RESOLVED" ? "color: #0ea5e9; font-weight: 600;" :
+                    "color: #f59e0b; font-weight: 600;";
+
+                return `
                 <article class="report-card">
-
                     <div class="report-card-header">
-
                         <div>
-
                             <span class="section-label">
-                                ${this.escapeHtml(
-                                    report.reportType || "REPORT"
-                                )}
+                                ${this.escapeHtml(report.reportType || "REPORT")}
                             </span>
-
                             <h4>
-                                ${this.escapeHtml(
-                                    report.description ||
-                                    "Traffic report"
-                                )}
+                                ${this.escapeHtml(report.description || "Traffic report")}
                             </h4>
-
                         </div>
-
-                        <span>
-                            ${this.escapeHtml(
-                                report.status || "PENDING"
-                            )}
+                        <span style="${statusClass}">
+                            ${this.escapeHtml(status)}
                         </span>
-
                     </div>
-
                     <div class="report-card-details">
-
                         <div>
                             <span>ROAD</span>
-                            <strong>
-                                ${this.escapeHtml(
-                                    report.road?.name || "Not specified"
-                                )}
-                            </strong>
+                            <strong>${this.escapeHtml(report.roadName || "Not specified")}</strong>
                         </div>
-
                         <div>
                             <span>LOCATION</span>
-                            <strong>
-                                ${this.escapeHtml(
-                                    report.location?.name || "Not specified"
-                                )}
-                            </strong>
+                            <strong>${this.escapeHtml(report.locationName || "Not specified")}</strong>
                         </div>
-
                         <div>
                             <span>REPORTED</span>
-                            <strong>
-                                ${this.escapeHtml(
-                                    this.formatDateTime(report.reportedAt)
-                                )}
-                            </strong>
+                            <strong>${this.escapeHtml(this.formatDateTime(report.reportedAt))}</strong>
                         </div>
-
+                        ${report.reviewedAt
+                            ? `<div>
+                                    <span>REVIEWED</span>
+                                    <strong>${this.escapeHtml(this.formatDateTime(report.reviewedAt))}</strong>
+                               </div>`
+                            : ""}
                     </div>
-
+                    ${isPending ? `
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button
+                                onclick="CityPulseApp.updateReportStatus(${report.id}, 'APPROVED')"
+                                style="flex: 1;
+                                       padding: 6px 10px;
+                                       background: #22c55e;
+                                       color: white;
+                                       border: none;
+                                       border-radius: 4px;
+                                       font-size: 12px;
+                                       font-weight: 600;
+                                       cursor: pointer;">
+                                ✅ Approve
+                            </button>
+                            <button
+                                onclick="CityPulseApp.updateReportStatus(${report.id}, 'REJECTED')"
+                                style="flex: 1;
+                                       padding: 6px 10px;
+                                       background: #ef4444;
+                                       color: white;
+                                       border: none;
+                                       border-radius: 4px;
+                                       font-size: 12px;
+                                       font-weight: 600;
+                                       cursor: pointer;">
+                                ❌ Reject
+                            </button>
+                        </div>
+                    ` : `
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button
+                                onclick="CityPulseApp.updateReportStatus(${report.id}, 'PENDING')"
+                                style="flex: 1;
+                                       padding: 6px 10px;
+                                       background: #64748b;
+                                       color: white;
+                                       border: none;
+                                       border-radius: 4px;
+                                       font-size: 11px;
+                                       cursor: pointer;">
+                                ↻ Reset to Pending
+                            </button>
+                        </div>
+                    `}
                 </article>
-            `).join("");
+            `;
+
+            }).join("");
+
+    },
+
+
+    async updateReportStatus(reportId, newStatus) {
+
+        try {
+
+            await this.apiRequest(
+                `/api/reports/${reportId}/status`,
+                {
+                    method: "PATCH",
+                    body: { status: newStatus }
+                }
+            );
+
+            await this.loadCitizenReports();
+
+            this.showCitizenReportMessage(
+                `Report #${reportId} status updated to ${newStatus}.`,
+                "success"
+            );
+
+        } catch (error) {
+
+            console.error("Update report status failed:", error);
+            this.showCitizenReportMessage(
+                error.message || "Unable to update report status.",
+                "error"
+            );
+
+        }
 
     },
 
 
     showCitizenReportMessage(message, type = "info") {
 
-        const element =
-            document.getElementById("report-analysis-message");
-
+        const element = document.getElementById("report-analysis-message");
         if (!element) return;
 
         element.textContent = message;
-
         element.className = `analysis-message ${type}`;
-
         element.style.display = "block";
 
     },
 
 
+    /* ============================================
+       CITYPULSE AI
+    ============================================ */
+
     setupCityPulseAiControls() {
 
-        const form =
-            document.getElementById("ai-question-form");
-
-        const questionInput =
-            document.getElementById("ai-question");
-
-        const quickQuestionButtons =
-            document.querySelectorAll(".ai-question-button");
-
+        const form = document.getElementById("ai-question-form");
+        const questionInput = document.getElementById("ai-question");
+        const quickQuestionButtons = document.querySelectorAll(".ai-question-button");
 
         if (form) {
-
-            form.addEventListener(
-                "submit",
-                event => {
-
-                    event.preventDefault();
-
-                    this.askCityPulseAi();
-
-                }
-            );
-
+            form.addEventListener("submit", event => {
+                event.preventDefault();
+                this.askCityPulseAi();
+            });
         }
 
-
         quickQuestionButtons.forEach(button => {
-
             button.addEventListener("click", () => {
-
-                const question =
-                    button.dataset.question || "";
-
+                const question = button.dataset.question || "";
                 if (!question) return;
-
                 if (questionInput) questionInput.value = question;
-
                 this.askCityPulseAi(question);
-
             });
-
         });
 
     },
@@ -2866,31 +3170,17 @@ const CityPulseApp = {
     loadCityPulseAiPage() {
 
         const input = document.getElementById("ai-question");
+        const chatContainer = document.getElementById("ai-chat-container");
 
-        const chatContainer =
-            document.getElementById("ai-chat-container");
-
-
-        if (
-            chatContainer &&
-            chatContainer.children.length === 0
-        ) {
+        if (chatContainer && chatContainer.children.length === 0) {
 
             const welcome = document.createElement("div");
-
             welcome.id = "ai-welcome-message";
-
             welcome.className = "empty-state";
-
             welcome.innerHTML = `
                 <h4>Welcome to CityPulse AI</h4>
-                <p>
-                    Ask about traffic conditions,
-                    congestion predictions, weather
-                    impact, alerts or citizen reports.
-                </p>
+                <p>Ask about traffic conditions, congestion predictions, weather impact, alerts or citizen reports.</p>
             `;
-
             chatContainer.appendChild(welcome);
 
         }
@@ -2903,42 +3193,28 @@ const CityPulseApp = {
     async askCityPulseAi(questionOverride = null) {
 
         const input = document.getElementById("ai-question");
-
         const button = document.getElementById("ask-ai-button");
-
         const container = document.getElementById("ai-chat-container");
-
         const welcome = document.getElementById("ai-welcome-message");
-
 
         if (!container) return;
 
-
-        const question =
-            questionOverride !== null
-                ? String(questionOverride).trim()
-                : (input ? input.value.trim() : "");
-
+        const question = questionOverride !== null
+            ? String(questionOverride).trim()
+            : (input ? input.value.trim() : "");
 
         if (!question) {
-
             this.showAiMessage("Please enter a question.", "error");
-
             return;
-
         }
 
         if (question.length > 500) {
-
             this.showAiMessage(
                 "Your question is too long. Please keep it within 500 characters.",
                 "error"
             );
-
             return;
-
         }
-
 
         if (button) {
             button.disabled = true;
@@ -2947,40 +3223,23 @@ const CityPulseApp = {
 
         this.showAiMessage("", "info", false);
 
-
         if (welcome) welcome.style.display = "none";
 
         this.appendAiMessage(question, "user");
-
         if (input) input.value = "";
-
 
         try {
 
-            const response =
-                await this.apiRequest(
-                    "/api/ai/ask",
-                    {
-                        method: "POST",
-                        body: { question }
-                    }
-                );
-
+            const response = await this.apiRequest(
+                "/api/ai/ask",
+                { method: "POST", body: { question } }
+            );
 
             if (!response || !response.answer) {
-
-                throw new Error(
-                    "CityPulse AI returned an empty response."
-                );
-
+                throw new Error("CityPulse AI returned an empty response.");
             }
 
-
-            this.appendAiMessage(
-                response.answer,
-                "assistant",
-                response
-            );
+            this.appendAiMessage(response.answer, "assistant", response);
 
             this.showAiMessage(
                 "CityPulse AI response generated using CityPulse data.",
@@ -2997,8 +3256,7 @@ const CityPulseApp = {
             );
 
             this.showAiMessage(
-                error.message ||
-                "CityPulse AI request failed.",
+                error.message || "CityPulse AI request failed.",
                 "error"
             );
 
@@ -3008,7 +3266,6 @@ const CityPulseApp = {
                 button.disabled = false;
                 button.textContent = "Ask CityPulse AI";
             }
-
             if (input) input.focus();
 
         }
@@ -3018,37 +3275,24 @@ const CityPulseApp = {
 
     appendAiMessage(message, sender, responseData = null) {
 
-        const container =
-            document.getElementById("ai-chat-container");
-
+        const container = document.getElementById("ai-chat-container");
         if (!container) return;
 
-
         const messageElement = document.createElement("div");
-
         messageElement.className = `ai-message ai-message-${sender}`;
-
 
         const label = sender === "user" ? "YOU" : "CITYPULSE AI";
 
-
         let metadata = "";
-
 
         if (sender === "assistant" && responseData) {
 
-            const dataSource =
-                responseData.dataSource || "citypulse_data";
-
-            const responseType =
-                responseData.responseType || "CITYPULSE";
-
+            const dataSource = responseData.dataSource || "citypulse_data";
+            const responseType = responseData.responseType || "CITYPULSE";
 
             metadata = `
                 <div class="ai-message-source">
-                    ${this.escapeHtml(
-                        String(responseType).toUpperCase()
-                    )}
+                    ${this.escapeHtml(String(responseType).toUpperCase())}
                     &nbsp;•&nbsp;
                     ${this.escapeHtml(String(dataSource))}
                 </div>
@@ -3056,22 +3300,13 @@ const CityPulseApp = {
 
         }
 
-
         messageElement.innerHTML = `
-            <div class="ai-message-label">
-                ${label}
-            </div>
-
-            <div class="ai-message-content">
-                ${this.formatAiAnswer(message)}
-            </div>
-
+            <div class="ai-message-label">${label}</div>
+            <div class="ai-message-content">${this.formatAiAnswer(message)}</div>
             ${metadata}
         `;
 
-
         container.appendChild(messageElement);
-
         container.scrollTop = container.scrollHeight;
 
     },
@@ -3080,72 +3315,51 @@ const CityPulseApp = {
     formatAiAnswer(message) {
 
         if (message === null || message === undefined) return "";
-
-        return this.escapeHtml(String(message))
-            .replace(/\r?\n/g, "<br>");
+        return this.escapeHtml(String(message)).replace(/\r?\n/g, "<br>");
 
     },
 
 
     showAiMessage(message, type = "info", visible = true) {
 
-        const element =
-            document.getElementById("ai-analysis-message");
-
+        const element = document.getElementById("ai-analysis-message");
         if (!element) return;
 
         element.textContent = message || "";
-
         element.className = `analysis-message ${type}`;
-
         element.style.display = visible ? "block" : "none";
 
     },
 
 
+    /* ============================================
+       LANGUAGE
+    ============================================ */
+
     setupLanguageControls() {
 
-        const selector =
-            document.getElementById("language-select");
-
+        const selector = document.getElementById("language-select");
         if (!selector) return;
 
+        const stored = localStorage.getItem("citypulse.language");
 
-        const stored =
-            localStorage.getItem("citypulse.language");
-
-        const initial =
-            (
-                window.CityPulseTranslations &&
-                window.CityPulseTranslations.supportedLanguages &&
-                window.CityPulseTranslations.supportedLanguages.includes(stored)
-            )
-                ? stored
-                : "en";
-
+        const initial = (
+            window.CityPulseTranslations &&
+            window.CityPulseTranslations.supportedLanguages &&
+            window.CityPulseTranslations.supportedLanguages.includes(stored)
+        ) ? stored : "en";
 
         selector.value = initial;
-
         this.applyTranslations(initial);
-
         this.applyDirection(initial);
-
         this.currentLanguage = initial;
-
 
         selector.addEventListener("change", () => {
 
             const lang = selector.value;
-
-            localStorage.setItem(
-                "citypulse.language",
-                lang
-            );
-
+            localStorage.setItem("citypulse.language", lang);
             this.currentLanguage = lang;
-
             this.applyTranslations(lang);
-
             this.applyDirection(lang);
 
         });
@@ -3159,35 +3373,18 @@ const CityPulseApp = {
             !window.CityPulseTranslations ||
             typeof window.CityPulseTranslations.get !== "function"
         ) {
-
             return;
-
         }
 
-
-        const elements =
-            document.querySelectorAll("[data-i18n]");
-
+        const elements = document.querySelectorAll("[data-i18n]");
 
         elements.forEach(element => {
-
             const key = element.dataset.i18n;
-
-            const translated =
-                window.CityPulseTranslations.get(
-                    language,
-                    key
-                );
-
-            if (translated) {
-                element.textContent = translated;
-            }
-
+            const translated = window.CityPulseTranslations.get(language, key);
+            if (translated) element.textContent = translated;
         });
 
-
         const pageTitleMap = {
-
             dashboard: "header.title",
             traffic: "traffic.title",
             prediction: "prediction.title",
@@ -3198,32 +3395,15 @@ const CityPulseApp = {
             reports: "reports.title",
             assistant: "assistant.title",
             global: "global.title"
-
         };
 
-
-        const currentSection =
-            this.currentSection || "dashboard";
-
-        const titleKey =
-            pageTitleMap[currentSection];
-
-
-        const pageTitle =
-            document.getElementById("page-title");
+        const currentSection = this.currentSection || "dashboard";
+        const titleKey = pageTitleMap[currentSection];
+        const pageTitle = document.getElementById("page-title");
 
         if (pageTitle && titleKey) {
-
-            const translated =
-                window.CityPulseTranslations.get(
-                    language,
-                    titleKey
-                );
-
-            if (translated) {
-                pageTitle.textContent = translated;
-            }
-
+            const translated = window.CityPulseTranslations.get(language, titleKey);
+            if (translated) pageTitle.textContent = translated;
         }
 
     },
@@ -3231,100 +3411,88 @@ const CityPulseApp = {
 
     applyDirection(language) {
 
-        const html =
-            document.documentElement;
-
+        const html = document.documentElement;
         if (!html) return;
 
         if (language === "ar") {
-
             html.setAttribute("dir", "rtl");
             html.setAttribute("lang", "ar");
-
         } else {
-
             html.setAttribute("dir", "ltr");
             html.setAttribute("lang", language || "en");
-
         }
 
     },
 
 
+    /* ============================================
+       GLOBAL WORLD MAP
+    ============================================ */
+
     setupGlobalWorldMapControls() {
 
-        const countrySelect =
-            document.getElementById("global-country-select");
-
-        const searchInput =
-            document.getElementById("global-country-search");
-
-        const regionFilter =
-            document.getElementById("global-region-filter");
-
-        const resetButton =
-            document.getElementById("global-reset-view-button");
-
-        const compareButton =
-            document.getElementById("global-compare-button");
-
+        const countrySelect = document.getElementById("global-country-select");
+        const searchInput = document.getElementById("global-country-search");
+        const regionFilter = document.getElementById("global-region-filter");
+        const resetButton = document.getElementById("global-reset-view-button");
+        const compareButton = document.getElementById("global-compare-button");
 
         if (countrySelect) {
+            if (
+                typeof window.CityPulseFlagDropdown === "function" &&
+                !window.__cityPulseFlagDropdown
+            ) {
+                window.__cityPulseFlagDropdown = new window.CityPulseFlagDropdown({
+                    selectEl: countrySelect,
+                    countries: this.countries || [],
+                    placeholder: "Select a country",
+                    onChange: (code) => {
+                        if (code) {
+                            this.handleGlobalCountrySelection(code);
+                        } else {
+                            this.resetGlobalCountrySelection();
+                        }
+                    }
+                });
+            }
 
             countrySelect.addEventListener("change", () => {
-
+                if (window.__cityPulseFlagDropdown) return;
                 const code = countrySelect.value;
-
                 if (code) {
                     this.handleGlobalCountrySelection(code);
                 } else {
                     this.resetGlobalCountrySelection();
                 }
-
             });
-
         }
-
 
         if (searchInput) {
-
             searchInput.addEventListener("input", () => {
-
                 this.applyGlobalFilters();
-
             });
-
         }
-
 
         if (regionFilter) {
-
             regionFilter.addEventListener("change", () => {
-
                 this.applyGlobalFilters();
-
             });
-
         }
-
 
         if (resetButton) {
-
-            resetButton.addEventListener(
-                "click",
-                () => this.resetGlobalMapView()
-            );
-
+            resetButton.addEventListener("click", () => this.resetGlobalMapView());
         }
 
-
         if (compareButton) {
+            compareButton.addEventListener("click", () => this.handleGlobalComparison());
+        }
 
-            compareButton.addEventListener(
+        const profileButton = document.getElementById("global-view-profile-button");
+        if (profileButton) {
+            profileButton.addEventListener(
                 "click",
-                () => this.handleGlobalComparison()
+                () => this.openCountryProfile()
             );
-
         }
 
     },
@@ -3334,35 +3502,20 @@ const CityPulseApp = {
 
         try {
 
-            this.showGlobalMessage(
-                "Loading global coverage...",
-                "info"
-            );
-
+            this.showGlobalMessage("Loading global coverage...", "info");
 
             if (this.countries.length === 0) {
                 await this.loadGlobalCountries();
             }
 
-
             this.filteredCountries = this.countries.slice();
 
-
             this.populateGlobalCountrySelect();
-
             this.populateGlobalCompareSelects();
-
             this.initializeGlobalMap();
 
-            this.setElementText(
-                "global-countries-count",
-                this.countries.length
-            );
-
-            this.setElementText(
-                "global-coverage-status",
-                "READY"
-            );
+            this.setElementText("global-countries-count", this.countries.length);
+            this.setElementText("global-coverage-status", "READY");
 
             this.showGlobalMessage(
                 `${this.countries.length} countries loaded successfully.`,
@@ -3372,12 +3525,7 @@ const CityPulseApp = {
         } catch (error) {
 
             console.error("Global world map loading failed:", error);
-
-            this.setElementText(
-                "global-coverage-status",
-                "ERROR"
-            );
-
+            this.setElementText("global-coverage-status", "ERROR");
             this.showGlobalMessage(
                 "Unable to load Global World Map data.",
                 "error"
@@ -3390,11 +3538,8 @@ const CityPulseApp = {
 
     async loadGlobalCountries() {
 
-        const data =
-            await this.apiRequest("/api/global/countries");
-
+        const data = await this.apiRequest("/api/global/countries");
         this.countries = Array.isArray(data) ? data : [];
-
         return this.countries;
 
     },
@@ -3404,9 +3549,7 @@ const CityPulseApp = {
 
         if (!countryCode) return "";
 
-        const code =
-            String(countryCode).trim().toLowerCase();
-
+        const code = String(countryCode).trim().toLowerCase();
         if (code.length !== 2) return "";
 
         return `<img src="https://flagcdn.com/w40/${code}.png"
@@ -3425,39 +3568,10 @@ const CityPulseApp = {
     },
 
 
-    countryCodeToFlagEmoji(countryCode) {
-
-        if (!countryCode) return "";
-
-        const code =
-            String(countryCode).trim().toUpperCase();
-
-        if (code.length !== 2) return "";
-
-        const codePoints = code
-            .split("")
-            .map(char => 127397 + char.charCodeAt(0));
-
-        try {
-
-            return String.fromCodePoint(...codePoints);
-
-        } catch (error) {
-
-            return "";
-
-        }
-
-    },
-
-
     populateGlobalCountrySelect() {
 
-        const select =
-            document.getElementById("global-country-select");
-
+        const select = document.getElementById("global-country-select");
         if (!select) return;
-
 
         const current = select.value;
 
@@ -3467,40 +3581,34 @@ const CityPulseApp = {
             </option>
         `;
 
-
         this.filteredCountries.forEach(country => {
 
             if (!country || !country.code) return;
 
             const option = document.createElement("option");
-
             option.value = String(country.code);
 
-            const flag =
-                this.countryCodeToFlagEmoji(country.code);
+            const flagImage = this.countryCodeToFlagImage(country.code);
+            const safeName = this.escapeHtml(country.name || country.code);
 
-            option.textContent =
-                `${flag} ${country.name || country.code}`.trim();
-
+            option.innerHTML = `${flagImage}<span>${safeName}</span>`;
             select.appendChild(option);
 
         });
 
-
         if (
             current &&
             this.filteredCountries.some(
-                country =>
-                    String(country.code) === String(current)
+                country => String(country.code) === String(current)
             )
         ) {
-
             select.value = current;
-
         } else {
-
             select.value = "";
+        }
 
+        if (window.__cityPulseFlagDropdown) {
+            window.__cityPulseFlagDropdown.setCountries(this.filteredCountries);
         }
 
     },
@@ -3508,68 +3616,29 @@ const CityPulseApp = {
 
     populateGlobalCompareSelects() {
 
-        const selectA =
-            document.getElementById("global-compare-a");
-
-        const selectB =
-            document.getElementById("global-compare-b");
-
+        const selectA = document.getElementById("global-compare-a");
+        const selectB = document.getElementById("global-compare-b");
 
         if (selectA) {
-
-            selectA.innerHTML = `
-                <option value="">
-                    Select Country A
-                </option>
-            `;
-
+            selectA.innerHTML = `<option value="">Select Country A</option>`;
             this.countries.forEach(country => {
-
                 if (!country || !country.code) return;
-
                 const option = document.createElement("option");
-
                 option.value = String(country.code);
-
-                const flag =
-                    this.countryCodeToFlagEmoji(country.code);
-
-                option.textContent =
-                    `${flag} ${country.name || country.code}`.trim();
-
+                option.innerHTML = `${this.countryCodeToFlagImage(country.code)}<span>${this.escapeHtml(country.name || country.code)}</span>`;
                 selectA.appendChild(option);
-
             });
-
         }
 
-
         if (selectB) {
-
-            selectB.innerHTML = `
-                <option value="">
-                    Select Country B
-                </option>
-            `;
-
+            selectB.innerHTML = `<option value="">Select Country B</option>`;
             this.countries.forEach(country => {
-
                 if (!country || !country.code) return;
-
                 const option = document.createElement("option");
-
                 option.value = String(country.code);
-
-                const flag =
-                    this.countryCodeToFlagEmoji(country.code);
-
-                option.textContent =
-                    `${flag} ${country.name || country.code}`.trim();
-
+                option.innerHTML = `${this.countryCodeToFlagImage(country.code)}<span>${this.escapeHtml(country.name || country.code)}</span>`;
                 selectB.appendChild(option);
-
             });
-
         }
 
     },
@@ -3577,36 +3646,23 @@ const CityPulseApp = {
 
     applyGlobalFilters() {
 
-        const searchInput =
-            document.getElementById("global-country-search");
+        const searchInput = document.getElementById("global-country-search");
+        const regionFilter = document.getElementById("global-region-filter");
 
-        const regionFilter =
-            document.getElementById("global-region-filter");
+        const query = searchInput
+            ? String(searchInput.value).trim().toLowerCase()
+            : "";
 
-
-        const query =
-            searchInput
-                ? String(searchInput.value).trim().toLowerCase()
-                : "";
-
-        const region =
-            regionFilter
-                ? String(regionFilter.value).trim().toLowerCase()
-                : "";
-
+        const region = regionFilter
+            ? String(regionFilter.value).trim().toLowerCase()
+            : "";
 
         this.filteredCountries =
             this.countries.filter(country => {
 
-                const name =
-                    String(country.name || "").toLowerCase();
-
-                const code =
-                    String(country.code || "").toLowerCase();
-
-                const countryRegion =
-                    String(country.region || "").toLowerCase();
-
+                const name = String(country.name || "").toLowerCase();
+                const code = String(country.code || "").toLowerCase();
+                const countryRegion = String(country.region || "").toLowerCase();
 
                 const matchesSearch =
                     !query ||
@@ -3614,74 +3670,41 @@ const CityPulseApp = {
                     code.includes(query) ||
                     countryRegion.includes(query);
 
-
-                const matchesRegion =
-                    !region ||
-                    countryRegion === region;
-
+                const matchesRegion = !region || countryRegion === region;
 
                 return matchesSearch && matchesRegion;
 
             });
 
-
         this.populateGlobalCountrySelect();
 
-
-        const statusElement =
-            document.getElementById("global-country-search-status");
-
+        const statusElement = document.getElementById("global-country-search-status");
 
         if (statusElement) {
-
             const hasFilter = query || region;
-
             if (!hasFilter) {
-
                 statusElement.textContent = "";
-
             } else {
-
                 const parts = [];
-
                 if (region) {
-
-                    const readableRegion =
-                        regionFilter.options[regionFilter.selectedIndex].text;
-
+                    const readableRegion = regionFilter.options[regionFilter.selectedIndex].text;
                     parts.push(`Region: ${readableRegion}`);
-
                 }
-
                 if (query) {
-
                     parts.push(`Search: "${searchInput.value.trim()}"`);
-
                 }
-
-
                 statusElement.textContent =
                     `${parts.join(" • ")} • Showing ${this.filteredCountries.length} of ${this.countries.length} countries`;
-
             }
-
         }
 
-
         if (this.filteredCountries.length === 0) {
-
-            this.showGlobalMessage(
-                "No countries match the current filters.",
-                "info"
-            );
-
+            this.showGlobalMessage("No countries match the current filters.", "info");
         } else {
-
             this.showGlobalMessage(
                 `${this.filteredCountries.length} country match(es) found.`,
                 "success"
             );
-
         }
 
     },
@@ -3689,8 +3712,7 @@ const CityPulseApp = {
 
     initializeGlobalMap() {
 
-        const mapElement =
-            document.getElementById("global-map");
+        const mapElement = document.getElementById("global-map");
 
         if (!mapElement) return;
 
@@ -3700,31 +3722,24 @@ const CityPulseApp = {
         }
 
         if (this.globalMap) {
-
             this.globalMap.invalidateSize();
-
             return;
-
         }
 
-
-        this.globalMap =
-            L.map(
-                mapElement,
-                {
-                    worldCopyJump: true,
-                    minZoom: 2,
-                    maxZoom: 12
-                }
-            ).setView([20, 0], 2);
-
+        this.globalMap = L.map(
+            mapElement,
+            {
+                worldCopyJump: true,
+                minZoom: 2,
+                maxZoom: 12
+            }
+        ).setView([20, 0], 2);
 
         L.tileLayer(
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
             {
                 maxZoom: 19,
-                attribution:
-                    "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community"
+                attribution: "Tiles &copy; Esri"
             }
         ).addTo(this.globalMap);
 
@@ -3733,138 +3748,97 @@ const CityPulseApp = {
 
     async handleGlobalCountrySelection(countryCode) {
 
-        const code =
-            String(countryCode).trim().toUpperCase();
-
+        const code = String(countryCode).trim().toUpperCase();
         if (!code) return;
 
-
-        const country =
-            this.countries.find(
-                item => String(item.code).toUpperCase() === code
-            );
-
+        const country = this.countries.find(
+            item => String(item.code).toUpperCase() === code
+        );
 
         if (!country) {
-
-            this.showGlobalMessage(
-                "Selected country is not available.",
-                "error"
-            );
-
+            this.showGlobalMessage("Selected country is not available.", "error");
             return;
-
         }
-
 
         this.globalSelectedCountryCode = code;
 
+        this.setElementText("global-selected-country", country.name || code);
+        this.setElementText("global-selected-code", code);
 
-        this.setElementText(
-            "global-selected-country",
-            country.name || code
-        );
+        const countryFlagElement = document.getElementById("global-country-flag");
+        if (countryFlagElement) {
+            countryFlagElement.src = `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
+            countryFlagElement.alt = `${country.name || code} flag`;
+            countryFlagElement.style.display = "inline-block";
+        }
 
-        this.setElementText(
-            "global-selected-code",
-            code
-        );
-
+        const profileBtn = document.getElementById("global-view-profile-button");
+        if (profileBtn) profileBtn.style.display = "inline-block";
 
         this.renderGlobalCountryProfile(country);
-
         this.loadCountryTrafficSummary(code);
-
         this.startCountryClock(country);
 
-
-        const latitude =
-            country.latitude !== null &&
-            country.latitude !== undefined
-                ? Number(country.latitude)
-                : null;
-
-        const longitude =
-            country.longitude !== null &&
-            country.longitude !== undefined
-                ? Number(country.longitude)
-                : null;
-
+        const latitude = country.latitude !== null && country.latitude !== undefined
+            ? Number(country.latitude) : null;
+        const longitude = country.longitude !== null && country.longitude !== undefined
+            ? Number(country.longitude) : null;
 
         if (
-            latitude === null ||
-            longitude === null ||
-            !Number.isFinite(latitude) ||
-            !Number.isFinite(longitude)
+            latitude === null || longitude === null ||
+            !Number.isFinite(latitude) || !Number.isFinite(longitude)
         ) {
-
             this.showGlobalMessage(
                 `${country.name} coordinates are not available in CityPulse.`,
                 "error"
             );
-
             return;
-
         }
 
-
         if (!this.globalMap) return;
-
 
         if (this.globalCountryMarker) {
             this.globalMap.removeLayer(this.globalCountryMarker);
             this.globalCountryMarker = null;
         }
-
         if (this.globalCountryCircle) {
             this.globalMap.removeLayer(this.globalCountryCircle);
             this.globalCountryCircle = null;
         }
 
-
         this.clearGlobalCityMarkers();
 
-
-        this.globalCountryCircle =
-            L.circle(
-                [latitude, longitude],
-                {
-                    radius: 350000,
-                    color: "#38bdf8",
-                    weight: 2,
-                    fillColor: "#0ea5e9",
-                    fillOpacity: 0.25
-                }
-            ).addTo(this.globalMap);
-
+        this.globalCountryCircle = L.circle(
+            [latitude, longitude],
+            {
+                radius: 350000,
+                color: "#38bdf8",
+                weight: 2,
+                fillColor: "#0ea5e9",
+                fillOpacity: 0.25
+            }
+        ).addTo(this.globalMap);
 
         const capital = country.capital || "N/A";
         const region = country.region || "N/A";
-        const flagImage =
-            this.countryCodeToFlagImage(country.code);
+        const flagImage = this.countryCodeToFlagImage(country.code);
 
-
-        this.globalCountryMarker =
-            L.marker([latitude, longitude])
-                .bindPopup(
-                    `<div style="display: flex; align-items: center; gap: 8px;">
-                        ${flagImage}
-                        <strong>${this.escapeHtml(country.name)}</strong>
-                     </div>
-                     <br>Capital: ${this.escapeHtml(capital)}
-                     <br>Region: ${this.escapeHtml(region)}
-                     <br>Code: ${this.escapeHtml(code)}
-                     <br>Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-                )
-                .addTo(this.globalMap);
-
+        this.globalCountryMarker = L.marker([latitude, longitude])
+            .bindPopup(
+                `<div style="display: flex; align-items: center; gap: 8px;">
+                    ${flagImage}
+                    <strong>${this.escapeHtml(country.name)}</strong>
+                 </div>
+                 <br>Capital: ${this.escapeHtml(capital)}
+                 <br>Region: ${this.escapeHtml(region)}
+                 <br>Code: ${this.escapeHtml(code)}
+                 <br>Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+            )
+            .addTo(this.globalMap);
 
         this.globalCountryMarker.openPopup();
 
-
-        const zoomLevel =
-            this.calculateZoomForCountry(country);
-
+        const zoomLevel = this.calculateZoomForCountry(country);
 
         this.globalMap.flyTo(
             [latitude, longitude],
@@ -3872,9 +3846,7 @@ const CityPulseApp = {
             { duration: 1.2 }
         );
 
-
         this.loadGlobalCityMarkers(code);
-
 
         this.showGlobalMessage(
             `${country.name} focused successfully.`,
@@ -3886,33 +3858,18 @@ const CityPulseApp = {
 
     async loadCountryTrafficSummary(countryCode) {
 
-        const panel =
-            document.getElementById("global-country-traffic-panel");
-
+        const panel = document.getElementById("global-country-traffic-panel");
         if (!panel) return;
 
-
         try {
-
-            const summary =
-                await this.apiRequest(
-                    `/api/global/countries/${countryCode}/traffic-summary`
-                );
-
-
-            this.renderCountryTrafficSummary(summary);
-
-            panel.style.display = "block";
-
-        } catch (error) {
-
-            console.error(
-                "Country traffic summary loading failed:",
-                error
+            const summary = await this.apiRequest(
+                `/api/global/countries/${countryCode}/traffic-summary`
             );
-
+            this.renderCountryTrafficSummary(summary);
+            panel.style.display = "block";
+        } catch (error) {
+            console.error("Country traffic summary loading failed:", error);
             panel.style.display = "none";
-
         }
 
     },
@@ -3922,85 +3879,26 @@ const CityPulseApp = {
 
         if (!summary) return;
 
+        const flagImage = this.countryCodeToFlagImage(summary.code);
 
-        const flagImage =
-            this.countryCodeToFlagImage(summary.code);
-
-
-        const titleElement =
-            document.getElementById("global-traffic-title");
-
+        const titleElement = document.getElementById("global-traffic-title");
         if (titleElement) {
-
             titleElement.innerHTML =
                 `<span style="display: inline-flex; align-items: center; gap: 8px;">${flagImage}<span>${this.escapeHtml(summary.countryName || "Traffic Summary")}</span></span>`;
-
         }
 
+        const riskBadge = document.getElementById("global-traffic-risk-badge");
+        if (riskBadge) riskBadge.textContent = summary.congestionRiskLevel || "—";
 
-        const riskBadge =
-            document.getElementById("global-traffic-risk-badge");
-
-        if (riskBadge) {
-
-            riskBadge.textContent =
-                summary.congestionRiskLevel || "—";
-
-        }
-
-
-        this.setElementText(
-            "global-traffic-cities",
-            this.formatNumber(summary.totalCities)
-        );
-
-
-        this.setElementText(
-            "global-traffic-risk",
-            this.formatNumber(summary.congestionRisk, 2)
-        );
-
-
-        this.setElementText(
-            "global-traffic-risk-level",
-            summary.congestionRiskLevel || "N/A"
-        );
-
-
-        this.setElementText(
-            "global-traffic-region",
-            summary.region || "N/A"
-        );
-
-
-        this.setElementText(
-            "global-traffic-peak-hours",
-            summary.estimatedPeakHours || "N/A"
-        );
-
-
-        this.setElementText(
-            "global-traffic-source",
-            summary.dataSource || "N/A"
-        );
-
-
-        this.setElementText(
-            "global-traffic-status",
-            summary.dataStatus || "N/A"
-        );
-
-
-        this.setElementText(
-            "global-traffic-peak-direction",
-            summary.estimatedPeakDirection || "N/A"
-        );
-
-
-        this.setElementText(
-            "global-traffic-api-status",
-            summary.realTrafficApiStatus || "N/A"
-        );
+        this.setElementText("global-traffic-cities", this.formatNumber(summary.totalCities));
+        this.setElementText("global-traffic-risk", this.formatNumber(summary.congestionRisk, 2));
+        this.setElementText("global-traffic-risk-level", summary.congestionRiskLevel || "N/A");
+        this.setElementText("global-traffic-region", summary.region || "N/A");
+        this.setElementText("global-traffic-peak-hours", summary.estimatedPeakHours || "N/A");
+        this.setElementText("global-traffic-source", summary.dataSource || "N/A");
+        this.setElementText("global-traffic-status", summary.dataStatus || "N/A");
+        this.setElementText("global-traffic-peak-direction", summary.estimatedPeakDirection || "N/A");
+        this.setElementText("global-traffic-api-status", summary.realTrafficApiStatus || "N/A");
 
     },
 
@@ -4009,63 +3907,31 @@ const CityPulseApp = {
 
         this.stopCountryClock();
 
-
         if (!country || !country.timezone) {
-
             this.setElementText("global-clock-country", "—");
             this.setElementText("global-clock-time", "—");
             this.setElementText("global-clock-day", "—");
             this.setElementText("global-clock-date", "—");
             this.setElementText("global-clock-zone", "—");
-            this.setElementText(
-                "global-clock-status",
-                "Timezone not available for this country."
-            );
-
+            this.setElementText("global-clock-status", "Timezone not available for this country.");
             return;
-
         }
 
+        const tz = String(country.timezone).trim();
+        const flagImage = this.countryCodeToFlagImage(country.code);
 
-        const tz =
-            String(country.timezone).trim();
-
-
-        const flagImage =
-            this.countryCodeToFlagImage(country.code);
-
-
-        const clockCountryElement =
-            document.getElementById("global-clock-country");
-
+        const clockCountryElement = document.getElementById("global-clock-country");
         if (clockCountryElement) {
-
             clockCountryElement.innerHTML =
                 `<span style="display: inline-flex; align-items: center; gap: 8px;">${flagImage}<span>${this.escapeHtml(country.name || country.code)}</span></span>`;
-
         }
 
-
-        this.setElementText(
-            "global-clock-zone",
-            `Time Zone: ${tz}`
-        );
-
-
-        this.setElementText(
-            "global-clock-status",
-            "Live local time • updates every second"
-        );
-
+        this.setElementText("global-clock-zone", `Time Zone: ${tz}`);
+        this.setElementText("global-clock-status", "Live local time • updates every second");
 
         this.updateCountryClock(tz);
 
-
-        this.globalClockTimer =
-            setInterval(
-                () => this.updateCountryClock(tz),
-                1000
-            );
+        this.globalClockTimer = setInterval(() => this.updateCountryClock(tz), 1000);
 
     },
 
@@ -4073,11 +3939,8 @@ const CityPulseApp = {
     stopCountryClock() {
 
         if (this.globalClockTimer) {
-
             clearInterval(this.globalClockTimer);
-
             this.globalClockTimer = null;
-
         }
 
     },
@@ -4087,73 +3950,37 @@ const CityPulseApp = {
 
         if (!tz) return;
 
-
         try {
 
             const now = new Date();
 
+            const timeFormatter = new Intl.DateTimeFormat("en-GB", {
+                timeZone: tz,
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true
+            });
 
-            const timeFormatter =
-                new Intl.DateTimeFormat(
-                    "en-GB",
-                    {
-                        timeZone: tz,
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                        hour12: true
-                    }
-                );
+            const dayFormatter = new Intl.DateTimeFormat("en-GB", {
+                timeZone: tz,
+                weekday: "long"
+            });
 
+            const dateFormatter = new Intl.DateTimeFormat("en-GB", {
+                timeZone: tz,
+                day: "2-digit",
+                month: "long",
+                year: "numeric"
+            });
 
-            const dayFormatter =
-                new Intl.DateTimeFormat(
-                    "en-GB",
-                    {
-                        timeZone: tz,
-                        weekday: "long"
-                    }
-                );
-
-
-            const dateFormatter =
-                new Intl.DateTimeFormat(
-                    "en-GB",
-                    {
-                        timeZone: tz,
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric"
-                    }
-                );
-
-
-            this.setElementText(
-                "global-clock-time",
-                timeFormatter.format(now)
-            );
-
-
-            this.setElementText(
-                "global-clock-day",
-                dayFormatter.format(now)
-            );
-
-
-            this.setElementText(
-                "global-clock-date",
-                dateFormatter.format(now)
-            );
+            this.setElementText("global-clock-time", timeFormatter.format(now));
+            this.setElementText("global-clock-day", dayFormatter.format(now));
+            this.setElementText("global-clock-date", dateFormatter.format(now));
 
         } catch (error) {
-
             console.warn("World clock update failed:", error);
-
-            this.setElementText(
-                "global-clock-status",
-                "Unable to render time for this timezone."
-            );
-
+            this.setElementText("global-clock-status", "Unable to render time for this timezone.");
         }
 
     },
@@ -4165,56 +3992,43 @@ const CityPulseApp = {
 
         try {
 
-            const cities =
-                await this.apiRequest(
-                    `/api/global/countries/${countryCode}/cities`
-                );
+            const response = await this.apiRequest(
+                `/api/global/countries/${countryCode}/cities`
+            );
 
-            if (!Array.isArray(cities) || cities.length === 0) {
+            const cities = Array.isArray(response?.cities)
+                ? response.cities
+                : (Array.isArray(response) ? response : []);
 
+            if (cities.length === 0) {
                 this.showGlobalMessage(
                     `No city data is available for ${countryCode} in CityPulse.`,
                     "info"
                 );
-
                 return;
-
             }
 
-
             this.clearGlobalCityMarkers();
-
 
             cities.forEach(city => {
 
                 const isCapital = city.capital === true;
 
-                const cityMarker =
-                    L.circleMarker(
-                        [
-                            Number(city.latitude),
-                            Number(city.longitude)
-                        ],
-                        {
-                            radius: isCapital ? 9 : 6,
-                            color: isCapital
-                                ? "#facc15"
-                                : "#38bdf8",
-                            fillColor: isCapital
-                                ? "#fbbf24"
-                                : "#0ea5e9",
-                            weight: 2,
-                            opacity: 1,
-                            fillOpacity: 0.9
-                        }
-                    );
+                const cityMarker = L.circleMarker(
+                    [Number(city.latitude), Number(city.longitude)],
+                    {
+                        radius: isCapital ? 9 : 6,
+                        color: isCapital ? "#facc15" : "#38bdf8",
+                        fillColor: isCapital ? "#fbbf24" : "#0ea5e9",
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }
+                );
 
-
-                const populationLabel =
-                    city.population
-                        ? Number(city.population).toLocaleString("en-IN")
-                        : "N/A";
-
+                const populationLabel = city.population
+                    ? Number(city.population).toLocaleString("en-IN")
+                    : "N/A";
 
                 cityMarker.bindPopup(
                     `<strong>${isCapital ? "⭐ " : ""}${this.escapeHtml(city.name)}</strong>
@@ -4222,13 +4036,10 @@ const CityPulseApp = {
                      <br>Population: ${populationLabel}`
                 );
 
-
                 cityMarker.addTo(this.globalMap);
-
                 this.globalCityMarkers.push(cityMarker);
 
             });
-
 
             this.showGlobalMessage(
                 `${cities.length} cities loaded for ${countryCode}.`,
@@ -4236,12 +4047,7 @@ const CityPulseApp = {
             );
 
         } catch (error) {
-
-            console.error(
-                "City markers loading failed:",
-                error
-            );
-
+            console.error("City markers loading failed:", error);
         }
 
     },
@@ -4250,11 +4056,8 @@ const CityPulseApp = {
     clearGlobalCityMarkers() {
 
         if (!this.globalMap) {
-
             this.globalCityMarkers = [];
-
             return;
-
         }
 
         this.globalCityMarkers.forEach(
@@ -4268,96 +4071,44 @@ const CityPulseApp = {
 
     renderGlobalCountryProfile(country) {
 
-        const panel =
-            document.getElementById("global-country-profile-panel");
-
+        const panel = document.getElementById("global-country-profile-panel");
         if (!panel) return;
-
 
         const population = country.population
             ? Number(country.population).toLocaleString("en-IN")
             : "N/A";
 
-        const flagImage =
-            this.countryCodeToFlagImage(country.code);
+        const flagImage = this.countryCodeToFlagImage(country.code);
 
-
-        const titleElement =
-            document.getElementById("global-profile-title");
-
+        const titleElement = document.getElementById("global-profile-title");
         if (titleElement) {
-
             titleElement.innerHTML =
                 `<span style="display: inline-flex; align-items: center; gap: 8px;">${flagImage}<span>${this.escapeHtml(country.name || "Country Profile")}</span></span>`;
-
         }
 
-
-        const nameElement =
-            document.getElementById("global-profile-name");
-
+        const nameElement = document.getElementById("global-profile-name");
         if (nameElement) {
-
             nameElement.innerHTML =
                 `<span style="display: inline-flex; align-items: center; gap: 8px;">${flagImage}<span>${this.escapeHtml(country.name || "—")}</span></span>`;
-
         }
 
+        this.setElementText("global-profile-region-badge", country.region || "—");
+        this.setElementText("global-profile-code", country.code || "—");
+        this.setElementText("global-profile-capital", country.capital || "N/A");
+        this.setElementText("global-profile-region", country.region || "N/A");
+        this.setElementText("global-profile-population", population);
+        this.setElementText("global-profile-currency", country.currency || "N/A");
+        this.setElementText("global-profile-timezone", country.timezone || "N/A");
 
-        this.setElementText(
-            "global-profile-region-badge",
-            country.region || "—"
-        );
-
-        this.setElementText(
-            "global-profile-code",
-            country.code || "—"
-        );
-
-        this.setElementText(
-            "global-profile-capital",
-            country.capital || "N/A"
-        );
-
-        this.setElementText(
-            "global-profile-region",
-            country.region || "N/A"
-        );
-
-        this.setElementText(
-            "global-profile-population",
-            population
-        );
-
-        this.setElementText(
-            "global-profile-currency",
-            country.currency || "N/A"
-        );
-
-        this.setElementText(
-            "global-profile-timezone",
-            country.timezone || "N/A"
-        );
-
-
-        const latitude =
-            country.latitude !== null &&
-            country.latitude !== undefined
-                ? Number(country.latitude).toFixed(4)
-                : "N/A";
-
-        const longitude =
-            country.longitude !== null &&
-            country.longitude !== undefined
-                ? Number(country.longitude).toFixed(4)
-                : "N/A";
-
+        const latitude = country.latitude !== null && country.latitude !== undefined
+            ? Number(country.latitude).toFixed(4) : "N/A";
+        const longitude = country.longitude !== null && country.longitude !== undefined
+            ? Number(country.longitude).toFixed(4) : "N/A";
 
         this.setElementText(
             "global-profile-coordinates",
             `Latitude: ${latitude} • Longitude: ${longitude}`
         );
-
 
         panel.style.display = "block";
 
@@ -4365,30 +4116,20 @@ const CityPulseApp = {
 
 
     hideGlobalCountryProfile() {
-
-        const panel =
-            document.getElementById("global-country-profile-panel");
-
+        const panel = document.getElementById("global-country-profile-panel");
         if (panel) panel.style.display = "none";
-
     },
 
 
     hideGlobalTrafficPanel() {
-
-        const panel =
-            document.getElementById("global-country-traffic-panel");
-
+        const panel = document.getElementById("global-country-traffic-panel");
         if (panel) panel.style.display = "none";
-
     },
 
 
     calculateZoomForCountry(country) {
 
-        const region =
-            String(country.region || "").toLowerCase();
-
+        const region = String(country.region || "").toLowerCase();
 
         if (region.includes("asia")) return 4;
         if (region.includes("europe")) return 5;
@@ -4404,65 +4145,42 @@ const CityPulseApp = {
 
     handleGlobalComparison() {
 
-        const selectA =
-            document.getElementById("global-compare-a");
+        const selectA = document.getElementById("global-compare-a");
+        const selectB = document.getElementById("global-compare-b");
 
-        const selectB =
-            document.getElementById("global-compare-b");
-
-
-        const codeA =
-            selectA ? String(selectA.value).trim().toUpperCase() : "";
-
-        const codeB =
-            selectB ? String(selectB.value).trim().toUpperCase() : "";
-
+        const codeA = selectA ? String(selectA.value).trim().toUpperCase() : "";
+        const codeB = selectB ? String(selectB.value).trim().toUpperCase() : "";
 
         if (!codeA || !codeB) {
-
             this.showGlobalCompareStatus(
                 "Please select both Country A and Country B.",
                 "error"
             );
-
             return;
-
         }
 
         if (codeA === codeB) {
-
             this.showGlobalCompareStatus(
                 "Please select two different countries.",
                 "error"
             );
-
             return;
-
         }
 
-
-        const countryA =
-            this.countries.find(
-                item => String(item.code).toUpperCase() === codeA
-            );
-
-        const countryB =
-            this.countries.find(
-                item => String(item.code).toUpperCase() === codeB
-            );
-
+        const countryA = this.countries.find(
+            item => String(item.code).toUpperCase() === codeA
+        );
+        const countryB = this.countries.find(
+            item => String(item.code).toUpperCase() === codeB
+        );
 
         if (!countryA || !countryB) {
-
             this.showGlobalCompareStatus(
                 "One of the selected countries is not available.",
                 "error"
             );
-
             return;
-
         }
-
 
         this.renderGlobalComparison(countryA, countryB);
 
@@ -4476,102 +4194,53 @@ const CityPulseApp = {
 
     renderGlobalComparison(countryA, countryB) {
 
-        const container =
-            document.getElementById("global-compare-results");
-
+        const container = document.getElementById("global-compare-results");
         if (!container) return;
 
-
         const formatPop = value =>
-            value
-                ? Number(value).toLocaleString("en-IN")
-                : "N/A";
+            value ? Number(value).toLocaleString("en-IN") : "N/A";
 
-
-        const populationA = countryA.population
-            ? Number(countryA.population)
-            : null;
-
-        const populationB = countryB.population
-            ? Number(countryB.population)
-            : null;
-
+        const populationA = countryA.population ? Number(countryA.population) : null;
+        const populationB = countryB.population ? Number(countryB.population) : null;
 
         let largerPopulation = null;
-
-        if (
-            populationA !== null &&
-            populationB !== null
-        ) {
-
+        if (populationA !== null && populationB !== null) {
             if (populationA > populationB) largerPopulation = "A";
             else if (populationB > populationA) largerPopulation = "B";
-
         }
 
-
-        const flagImageA =
-            this.countryCodeToFlagImage(countryA.code);
-
-        const flagImageB =
-            this.countryCodeToFlagImage(countryB.code);
-
+        const flagImageA = this.countryCodeToFlagImage(countryA.code);
+        const flagImageB = this.countryCodeToFlagImage(countryB.code);
 
         const row = (label, valueA, valueB, highlight = null) => {
 
-            const styleA =
-                highlight === "A"
-                    ? `style="color: #22c55e; font-weight: 700;"`
-                    : "";
-
-            const styleB =
-                highlight === "B"
-                    ? `style="color: #22c55e; font-weight: 700;"`
-                    : "";
+            const styleA = highlight === "A"
+                ? `style="color: #22c55e; font-weight: 700;"` : "";
+            const styleB = highlight === "B"
+                ? `style="color: #22c55e; font-weight: 700;"` : "";
 
             return `
                 <div class="route-result-grid"
                      style="grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
-
-                    <div>
-                        <span>${label}</span>
-                    </div>
-
-                    <div>
-                        <strong ${styleA}>
-                            ${valueA}${highlight === "A" ? " ✅" : ""}
-                        </strong>
-                    </div>
-
-                    <div>
-                        <strong ${styleB}>
-                            ${valueB}${highlight === "B" ? " ✅" : ""}
-                        </strong>
-                    </div>
-
+                    <div><span>${label}</span></div>
+                    <div><strong ${styleA}>${valueA}${highlight === "A" ? " ✅" : ""}</strong></div>
+                    <div><strong ${styleB}>${valueB}${highlight === "B" ? " ✅" : ""}</strong></div>
                 </div>
             `;
 
         };
 
-
         container.innerHTML = `
 
             <div class="route-result-grid"
                  style="grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px;">
-
-                <div>
-                    <span class="section-label">FIELD</span>
-                </div>
-
+                <div><span class="section-label">FIELD</span></div>
                 <div>
                     <span class="section-label" style="display: inline-flex; align-items: center; gap: 8px;">${flagImageA}<span>${this.escapeHtml(countryA.name)}</span></span>
                 </div>
-
                 <div>
                     <span class="section-label" style="display: inline-flex; align-items: center; gap: 8px;">${flagImageB}<span>${this.escapeHtml(countryB.name)}</span></span>
                 </div>
-
             </div>
 
             ${row("Name", `<span style="display: inline-flex; align-items: center; gap: 6px;">${flagImageA}<span>${this.escapeHtml(countryA.name)}</span></span>`, `<span style="display: inline-flex; align-items: center; gap: 6px;">${flagImageB}<span>${this.escapeHtml(countryB.name)}</span></span>`)}
@@ -4595,15 +4264,11 @@ const CityPulseApp = {
 
     showGlobalCompareStatus(message, type = "info") {
 
-        const element =
-            document.getElementById("global-compare-status");
-
+        const element = document.getElementById("global-compare-status");
         if (!element) return;
 
         element.textContent = message;
-
         element.className = `analysis-message ${type}`;
-
         element.style.display = "block";
 
     },
@@ -4614,18 +4279,21 @@ const CityPulseApp = {
         this.globalSelectedCountryCode = null;
 
         this.setElementText("global-selected-country", "—");
-
         this.setElementText("global-selected-code", "—");
 
+        const countryFlagElement = document.getElementById("global-country-flag");
+        if (countryFlagElement) {
+            countryFlagElement.style.display = "none";
+            countryFlagElement.src = "";
+        }
+
+        const profileBtn = document.getElementById("global-view-profile-button");
+        if (profileBtn) profileBtn.style.display = "none";
 
         this.hideGlobalCountryProfile();
-
         this.hideGlobalTrafficPanel();
-
         this.clearGlobalCityMarkers();
-
         this.stopCountryClock();
-
 
         this.setElementText("global-clock-country", "—");
         this.setElementText("global-clock-time", "—");
@@ -4634,19 +4302,15 @@ const CityPulseApp = {
         this.setElementText("global-clock-zone", "—");
         this.setElementText("global-clock-status", "");
 
-
         if (this.globalMap) {
-
             if (this.globalCountryMarker) {
                 this.globalMap.removeLayer(this.globalCountryMarker);
                 this.globalCountryMarker = null;
             }
-
             if (this.globalCountryCircle) {
                 this.globalMap.removeLayer(this.globalCountryCircle);
                 this.globalCountryCircle = null;
             }
-
         }
 
     },
@@ -4654,95 +4318,265 @@ const CityPulseApp = {
 
     resetGlobalMapView() {
 
-        const select =
-            document.getElementById("global-country-select");
-
+        const select = document.getElementById("global-country-select");
         if (select) select.value = "";
 
-        const searchInput =
-            document.getElementById("global-country-search");
-
+        const searchInput = document.getElementById("global-country-search");
         if (searchInput) searchInput.value = "";
 
-        const regionFilter =
-            document.getElementById("global-region-filter");
+        if (window.__cityPulseFlagDropdown) {
+            window.__cityPulseFlagDropdown.reset();
+            window.__cityPulseFlagDropdown.setCountries(this.countries);
+        }
 
+        const regionFilter = document.getElementById("global-region-filter");
         if (regionFilter) regionFilter.value = "";
 
-        const statusElement =
-            document.getElementById("global-country-search-status");
-
+        const statusElement = document.getElementById("global-country-search-status");
         if (statusElement) statusElement.textContent = "";
 
-        const selectA =
-            document.getElementById("global-compare-a");
-
+        const selectA = document.getElementById("global-compare-a");
         if (selectA) selectA.value = "";
 
-        const selectB =
-            document.getElementById("global-compare-b");
-
+        const selectB = document.getElementById("global-compare-b");
         if (selectB) selectB.value = "";
 
-        const compareResults =
-            document.getElementById("global-compare-results");
-
+        const compareResults = document.getElementById("global-compare-results");
         if (compareResults) compareResults.innerHTML = "";
 
-        const compareStatus =
-            document.getElementById("global-compare-status");
-
+        const compareStatus = document.getElementById("global-compare-status");
         if (compareStatus) {
-
             compareStatus.textContent = "";
-
             compareStatus.style.display = "none";
-
         }
-
 
         this.filteredCountries = this.countries.slice();
-
         this.populateGlobalCountrySelect();
-
-
         this.resetGlobalCountrySelection();
 
-
         if (this.globalMap) {
-
-            this.globalMap.flyTo(
-                [20, 0],
-                2,
-                { duration: 1.2 }
-            );
-
+            this.globalMap.flyTo([20, 0], 2, { duration: 1.2 });
         }
 
-
-        this.showGlobalMessage(
-            "Global map view reset.",
-            "info"
-        );
+        this.showGlobalMessage("Global map view reset.", "info");
 
     },
 
 
     showGlobalMessage(message, type = "info") {
 
-        const element =
-            document.getElementById("global-analysis-message");
-
+        const element = document.getElementById("global-analysis-message");
         if (!element) return;
 
         element.textContent = message;
-
         element.className = `analysis-message ${type}`;
-
         element.style.display = "block";
 
     },
 
+
+    /* ============================================
+       COUNTRY PROFILE MODAL
+    ============================================ */
+
+    async openCountryProfile() {
+
+        const code = this.globalSelectedCountryCode;
+
+        if (!code) {
+            this.showGlobalMessage("Please select a country first.", "info");
+            return;
+        }
+
+        const country = this.countries.find(
+            item => String(item.code).toUpperCase() === code
+        );
+
+        if (!country) {
+            this.showGlobalMessage("Selected country is not available.", "error");
+            return;
+        }
+
+        const modal = document.getElementById("country-profile-modal");
+        if (!modal) {
+            this.showGlobalMessage("Country profile modal is not available in this page.", "error");
+            return;
+        }
+
+        const flagEl = document.getElementById("profile-modal-flag");
+        if (flagEl) {
+            flagEl.src = `https://flagcdn.com/w80/${code.toLowerCase()}.png`;
+            flagEl.alt = `${country.name} flag`;
+        }
+
+        this.setElementText("profile-modal-name", country.name || code);
+        this.setElementText("profile-modal-region", country.region || "—");
+        this.setElementText("profile-modal-capital", country.capital || "N/A");
+        this.setElementText(
+            "profile-modal-population",
+            country.population
+                ? Number(country.population).toLocaleString("en-IN")
+                : "N/A"
+        );
+        this.setElementText("profile-modal-currency", country.currency || "N/A");
+        this.setElementText(
+            "profile-modal-coordinates",
+            `Latitude: ${Number(country.latitude).toFixed(4)} • Longitude: ${Number(country.longitude).toFixed(4)} • ISO: ${code}`
+        );
+
+        this._profileModalTimezone = country.timezone || "UTC";
+        this._updateProfileModalClock();
+        this._profileModalClockTimer = setInterval(() => this._updateProfileModalClock(), 1000);
+
+        modal.style.display = "block";
+
+        this._loadProfileModalCities(code);
+        this._loadProfileModalTraffic(code);
+
+    },
+
+
+    closeCountryProfileModal() {
+
+        if (this._profileModalClockTimer) {
+            clearInterval(this._profileModalClockTimer);
+            this._profileModalClockTimer = null;
+        }
+
+        const modal = document.getElementById("country-profile-modal");
+        if (modal) modal.style.display = "none";
+
+    },
+
+
+    _updateProfileModalClock() {
+
+        const timeEl = document.getElementById("profile-modal-time");
+        if (!timeEl) return;
+
+        try {
+            const tz = this._profileModalTimezone || "UTC";
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat("en-GB", {
+                timeZone: tz,
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true
+            });
+            timeEl.textContent = `${formatter.format(now)} (${tz})`;
+        } catch (error) {
+            timeEl.textContent = "—";
+        }
+
+    },
+
+
+    async _loadProfileModalCities(countryCode) {
+
+        const container = document.getElementById("profile-modal-cities");
+        if (!container) return;
+
+        container.innerHTML = `<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 14px;">Loading cities...</div>`;
+
+        try {
+
+            const response = await this.apiRequest(
+                `/api/global/countries/${countryCode}/cities`
+            );
+
+            const cities = Array.isArray(response?.cities)
+                ? response.cities
+                : (Array.isArray(response) ? response : []);
+
+            if (cities.length === 0) {
+                container.innerHTML = `<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 14px;">No cities tracked for this country yet.</div>`;
+                return;
+            }
+
+            container.innerHTML =
+                cities.map(city => `
+                    <div style="background: #0f172a;
+                                padding: 10px 12px;
+                                border-radius: 6px;
+                                border-left: 3px solid #0ea5e9;">
+                        <div style="color: #f1f5f9;
+                                    font-size: 14px;
+                                    font-weight: 600;">
+                            ${this.escapeHtml(city.name || "—")}
+                        </div>
+                        <div style="color: #64748b;
+                                    font-size: 11px;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    margin-top: 2px;">
+                            ${this.escapeHtml(city.tier || "")}
+                            ${city.type ? " • " + this.escapeHtml(city.type) : ""}
+                        </div>
+                    </div>
+                `).join("");
+
+        } catch (error) {
+            console.error("Profile modal cities loading failed:", error);
+            container.innerHTML = `<div style="grid-column: 1 / -1; color: #f87171; font-size: 14px;">Unable to load cities.</div>`;
+        }
+
+    },
+
+
+    async _loadProfileModalTraffic(countryCode) {
+
+        const container = document.getElementById("profile-modal-traffic");
+        if (!container) return;
+
+        container.innerHTML = `<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 14px;">Loading traffic summary...</div>`;
+
+        try {
+
+            const summary = await this.apiRequest(
+                `/api/global/countries/${countryCode}/traffic-summary`
+            );
+
+            const card = (label, value) => `
+                <div style="text-align: center;">
+                    <div style="color: #64748b;
+                                font-size: 11px;
+                                text-transform: uppercase;
+                                letter-spacing: 1px;
+                                margin-bottom: 4px;">
+                        ${label}
+                    </div>
+                    <div style="color: #f1f5f9;
+                                font-size: 16px;
+                                font-weight: 600;">
+                        ${value}
+                    </div>
+                </div>
+            `;
+
+            if (!summary || summary.coverageStatus === "UNAVAILABLE") {
+                container.innerHTML = `<div style="grid-column: 1 / -1; color: #94a3b8; font-size: 14px;">No regional traffic profile available for this country. Cities tracked: ${summary?.citiesTracked || 0}.</div>`;
+                return;
+            }
+
+            container.innerHTML =
+                card("RISK LEVEL", this.escapeHtml(summary.trafficRiskLevel || "—")) +
+                card("PEAK HOURS", this.escapeHtml(summary.peakHours || "—")) +
+                card("DIRECTION", this.escapeHtml(summary.peakDirection || "—")) +
+                card("URBAN PROFILE", this.escapeHtml(summary.urbanProfile || "—")) +
+                card("CITIES TRACKED", String(summary.citiesTracked || 0));
+
+        } catch (error) {
+            console.error("Profile modal traffic loading failed:", error);
+            container.innerHTML = `<div style="grid-column: 1 / -1; color: #f87171; font-size: 14px;">Unable to load traffic summary.</div>`;
+        }
+
+    },
+
+
+    /* ============================================
+       HELPERS
+    ============================================ */
 
     findRoad(roadId) {
 
@@ -4765,22 +4599,11 @@ const CityPulseApp = {
     getTrafficLevelClass(level) {
 
         switch (String(level || "").toUpperCase()) {
-
-            case "LOW":
-                return "traffic-low";
-
-            case "MODERATE":
-                return "traffic-moderate";
-
-            case "HIGH":
-                return "traffic-high";
-
-            case "SEVERE":
-                return "traffic-severe";
-
-            default:
-                return "";
-
+            case "LOW": return "traffic-low";
+            case "MODERATE": return "traffic-moderate";
+            case "HIGH": return "traffic-high";
+            case "SEVERE": return "traffic-severe";
+            default: return "";
         }
 
     },
@@ -4793,7 +4616,6 @@ const CityPulseApp = {
         }
 
         const number = Number(value);
-
         if (!Number.isFinite(number)) return "N/A";
 
         return number.toLocaleString(
@@ -4812,15 +4634,11 @@ const CityPulseApp = {
         if (!value) return "N/A";
 
         const date = new Date(value);
-
         if (Number.isNaN(date.getTime())) return String(value);
 
         return date.toLocaleString(
             "en-IN",
-            {
-                dateStyle: "medium",
-                timeStyle: "short"
-            }
+            { dateStyle: "medium", timeStyle: "short" }
         );
 
     },
@@ -4845,12 +4663,10 @@ const CityPulseApp = {
         const element = document.getElementById(id);
 
         if (element) {
-
             element.textContent =
                 value === null || value === undefined
                     ? "N/A"
                     : value;
-
         }
 
     },
@@ -4858,27 +4674,18 @@ const CityPulseApp = {
 
     updateApiConnectionStatus(connected) {
 
-        const statusElement =
-            document.getElementById("api-status");
-
+        const statusElement = document.getElementById("api-status");
         if (!statusElement) return;
 
-        statusElement.textContent =
-            connected ? "CONNECTED" : "DISCONNECTED";
-
-        statusElement.className =
-            connected
-                ? "status-connected"
-                : "status-disconnected";
+        statusElement.textContent = connected ? "CONNECTED" : "DISCONNECTED";
+        statusElement.className = connected ? "status-connected" : "status-disconnected";
 
     },
 
 
     showDashboardError() {
 
-        const container =
-            document.getElementById("traffic-overview");
-
+        const container = document.getElementById("traffic-overview");
         if (!container) return;
 
         container.innerHTML = `
@@ -4892,11 +4699,9 @@ const CityPulseApp = {
 
     renderTrafficPageError() {
 
-        const tableBody =
-            document.getElementById("traffic-table-body");
+        const tableBody = document.getElementById("traffic-table-body");
 
         if (tableBody) {
-
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="7">
@@ -4904,7 +4709,349 @@ const CityPulseApp = {
                     </td>
                 </tr>
             `;
+        }
 
+    },
+
+
+    /* ============================================
+       AUTH
+    ============================================ */
+
+    showLoginModal() {
+
+        const loginModal = document.getElementById("login-modal");
+        const registerModal = document.getElementById("register-modal");
+
+        if (loginModal) loginModal.style.display = "flex";
+        if (registerModal) registerModal.style.display = "none";
+
+        const emailInput = document.getElementById("login-email");
+        if (emailInput) emailInput.focus();
+
+    },
+
+
+    showRegisterModal() {
+
+        const loginModal = document.getElementById("login-modal");
+        const registerModal = document.getElementById("register-modal");
+
+        if (loginModal) loginModal.style.display = "none";
+        if (registerModal) registerModal.style.display = "flex";
+
+        const fullNameInput = document.getElementById("register-fullname");
+        if (fullNameInput) fullNameInput.focus();
+
+    },
+
+
+    hideAuthModals() {
+
+        const loginModal = document.getElementById("login-modal");
+        const registerModal = document.getElementById("register-modal");
+
+        if (loginModal) loginModal.style.display = "none";
+        if (registerModal) registerModal.style.display = "none";
+
+    },
+
+
+    showLoginError(message) {
+
+        const el = document.getElementById("login-error");
+        if (!el) return;
+        el.textContent = message || "";
+        el.style.display = message ? "block" : "none";
+
+    },
+
+
+    showRegisterError(message) {
+
+        const el = document.getElementById("register-error");
+        if (!el) return;
+        el.textContent = message || "";
+        el.style.display = message ? "block" : "none";
+
+    },
+
+
+    async login(email, password) {
+
+        this.showLoginError("");
+
+        const loginButton = document.getElementById("login-submit");
+        if (loginButton) {
+            loginButton.disabled = true;
+            loginButton.textContent = "Signing in...";
+        }
+
+        try {
+
+            const response = await fetch(
+                `${this.apiBaseUrl}/api/auth/login`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password })
+                }
+            );
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || "Login failed");
+            }
+
+            const data = await response.json();
+            this.handleAuthSuccess(data);
+            return true;
+
+        } catch (error) {
+
+            console.error("Login failed:", error);
+            this.showLoginError(error.message || "Invalid email or password.");
+            return false;
+
+        } finally {
+
+            if (loginButton) {
+                loginButton.disabled = false;
+                loginButton.textContent = "Sign In";
+            }
+
+        }
+
+    },
+
+
+    async register(fullName, email, phone, password) {
+
+        this.showRegisterError("");
+
+        const registerButton = document.getElementById("register-submit");
+        if (registerButton) {
+            registerButton.disabled = true;
+            registerButton.textContent = "Creating account...";
+        }
+
+        try {
+
+            const response = await fetch(
+                `${this.apiBaseUrl}/api/auth/register`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        fullName,
+                        email,
+                        phone: phone || null,
+                        password
+                    })
+                }
+            );
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || "Registration failed");
+            }
+
+            const data = await response.json();
+            this.handleAuthSuccess(data);
+            return true;
+
+        } catch (error) {
+
+            console.error("Registration failed:", error);
+            this.showRegisterError(error.message || "Unable to create account.");
+            return false;
+
+        } finally {
+
+            if (registerButton) {
+                registerButton.disabled = false;
+                registerButton.textContent = "Create Account";
+            }
+
+        }
+
+    },
+
+
+    handleAuthSuccess(data) {
+
+        this.authToken = data.token || null;
+        this.currentUser = {
+            id: data.id,
+            fullName: data.fullName,
+            email: data.email,
+            role: data.role
+        };
+
+        if (data.id) {
+            this.currentUserId = data.id;
+        }
+
+        if (this.authToken) {
+            localStorage.setItem("citypulse.token", this.authToken);
+        }
+        localStorage.setItem("citypulse.user", JSON.stringify(this.currentUser));
+
+        this.updateHeaderUserInfo();
+        this.hideAuthModals();
+        this.loadDashboard();
+
+    },
+
+
+    updateHeaderUserInfo() {
+
+        const nameEl = document.getElementById("user-name");
+        const roleEl = document.getElementById("user-role");
+        const avatarEl = document.getElementById("user-avatar");
+        const logoutBtn = document.getElementById("logout-button");
+
+        if (this.currentUser) {
+
+            if (nameEl) {
+                nameEl.textContent = this.currentUser.fullName || "CityPulse User";
+            }
+            if (roleEl) {
+                roleEl.textContent = this.currentUser.role || "USER";
+            }
+            if (avatarEl) {
+                const first = (this.currentUser.fullName || "U")
+                    .trim()
+                    .charAt(0)
+                    .toUpperCase();
+                avatarEl.textContent = first;
+            }
+            if (logoutBtn) {
+                logoutBtn.style.display = "inline-block";
+            }
+
+        } else {
+
+            if (nameEl) nameEl.textContent = "Guest";
+            if (roleEl) roleEl.textContent = "NOT LOGGED IN";
+            if (avatarEl) avatarEl.textContent = "?";
+            if (logoutBtn) {
+                logoutBtn.style.display = "none";
+            }
+
+        }
+
+    },
+
+
+    logout() {
+
+        this.authToken = null;
+        this.currentUser = null;
+
+        localStorage.removeItem("citypulse.token");
+        localStorage.removeItem("citypulse.user");
+
+        this.updateHeaderUserInfo();
+        this.showLoginModal();
+
+    },
+
+
+    tryRestoreAuthFromStorage() {
+
+        const storedToken = localStorage.getItem("citypulse.token");
+        const storedUser = localStorage.getItem("citypulse.user");
+
+        if (!storedToken) return false;
+
+        try {
+
+            const payloadB64 = storedToken.split(".")[1];
+            if (!payloadB64) return false;
+
+            const padded = payloadB64 + "=".repeat((4 - payloadB64.length % 4) % 4);
+
+            const payload = JSON.parse(
+                atob(padded.replace(/-/g, "+").replace(/_/g, "/"))
+            );
+
+            if (payload.exp && payload.exp * 1000 < Date.now()) {
+                localStorage.removeItem("citypulse.token");
+                localStorage.removeItem("citypulse.user");
+                return false;
+            }
+
+            this.authToken = storedToken;
+            this.currentUser = storedUser
+                ? JSON.parse(storedUser)
+                : {
+                    id: payload.userId,
+                    email: payload.sub,
+                    role: payload.role,
+                    fullName: payload.sub
+                };
+
+            if (this.currentUser && this.currentUser.id) {
+                this.currentUserId = this.currentUser.id;
+            }
+
+            this.updateHeaderUserInfo();
+            return true;
+
+        } catch (error) {
+            console.warn("Could not restore auth:", error);
+            localStorage.removeItem("citypulse.token");
+            localStorage.removeItem("citypulse.user");
+            return false;
+        }
+
+    },
+
+
+    setupAuthControls() {
+
+        const showRegisterBtn = document.getElementById("show-register-button");
+        if (showRegisterBtn) {
+            showRegisterBtn.addEventListener(
+                "click",
+                () => this.showRegisterModal()
+            );
+        }
+
+        const showLoginBtn = document.getElementById("show-login-button");
+        if (showLoginBtn) {
+            showLoginBtn.addEventListener(
+                "click",
+                () => this.showLoginModal()
+            );
+        }
+
+        const loginForm = document.getElementById("login-form");
+        if (loginForm) {
+            loginForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const email = document.getElementById("login-email")?.value || "";
+                const password = document.getElementById("login-password")?.value || "";
+                await this.login(email.trim(), password);
+            });
+        }
+
+        const registerForm = document.getElementById("register-form");
+        if (registerForm) {
+            registerForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const fullName = document.getElementById("register-fullname")?.value || "";
+                const email = document.getElementById("register-email")?.value || "";
+                const phone = document.getElementById("register-phone")?.value || "";
+                const password = document.getElementById("register-password")?.value || "";
+                await this.register(
+                    fullName.trim(),
+                    email.trim(),
+                    phone.trim(),
+                    password
+                );
+            });
         }
 
     }
@@ -4919,25 +5066,17 @@ const CityPulseApp = {
 document.addEventListener(
     "DOMContentLoaded",
     () => {
-
         CityPulseApp.init();
-
     }
 );
 
 
 /* ============================================
    CITYPULSE LIVE WEBSOCKET CLIENT
-   Real-time updates via STOMP over WebSocket
 ============================================ */
 
 (function () {
 
-    // ============================================
-    // FIX: STOMP 7 exposes the client as StompJs.Stomp,
-    // not as a global Stomp. We alias it here so that
-    // the rest of the client uses the classic name.
-    // ============================================
     var StompClient =
         (typeof Stomp !== "undefined")
             ? Stomp
@@ -4954,18 +5093,28 @@ document.addEventListener(
 
     function setLiveIndicator(text, cssClass) {
 
-        const indicator = document.getElementById(
-            "traffic-live-indicator");
-
+        const indicator = document.getElementById("traffic-live-indicator");
         if (!indicator) return;
 
         indicator.textContent = text;
-
         indicator.classList.remove("live", "offline", "connecting");
 
-        if (cssClass) {
-            indicator.classList.add(cssClass);
+        if (cssClass) indicator.classList.add(cssClass);
+
+        if (cssClass === "live") {
+            indicator.style.color = "#22c55e";
+            indicator.style.fontWeight = "600";
+        } else if (cssClass === "offline") {
+            indicator.style.color = "#ef4444";
+            indicator.style.fontWeight = "600";
+        } else if (cssClass === "connecting") {
+            indicator.style.color = "#eab308";
+            indicator.style.fontWeight = "600";
+        } else {
+            indicator.style.color = "";
+            indicator.style.fontWeight = "";
         }
+
     }
 
     function updateDashboardCounters(payload) {
@@ -4975,13 +5124,23 @@ document.addEventListener(
         const recordsEl = document.getElementById("traffic-records");
 
         if (recordsEl) {
-
             const current = parseInt(recordsEl.textContent, 10);
-
             if (!isNaN(current)) {
                 recordsEl.textContent = current + 1;
             }
         }
+
+    }
+
+    function notify(title, body, tag) {
+
+        if (
+            typeof CityPulseApp !== "undefined" &&
+            typeof CityPulseApp.showNotification === "function"
+        ) {
+            CityPulseApp.showNotification(title, body, "🚦", tag);
+        }
+
     }
 
     function handleTrafficUpdate(message) {
@@ -4994,53 +5153,73 @@ document.addEventListener(
             return;
         }
 
-        if (!envelope || envelope.event !== "TRAFFIC_UPDATED") {
-            return;
-        }
+        if (!envelope || envelope.event !== "TRAFFIC_UPDATED") return;
 
         const payload = envelope.payload || {};
 
         setLiveIndicator("● LIVE — update received", "live");
-
         updateDashboardCounters(payload);
 
-        const activeSection = document.querySelector(
-            ".page-section.active-section");
+        notify(
+            "🚦 Traffic Update",
+            `New traffic data received — level: ${payload.trafficLevel || "UNKNOWN"}`,
+            "traffic-update"
+        );
 
-        if (!activeSection) return;
+        const activeSection = document.querySelector(".page-section.active-section");
 
-        const sectionId = activeSection.id;
+        if (activeSection) {
 
-        try {
+            const sectionId = activeSection.id;
 
-            if (sectionId === "traffic-section") {
+            try {
 
-                if (typeof CityPulseApp.loadLiveTrafficPage === "function") {
-                    CityPulseApp.loadLiveTrafficPage();
+                if (sectionId === "traffic-section") {
+                    if (typeof CityPulseApp.loadLiveTrafficPage === "function") {
+                        CityPulseApp.loadLiveTrafficPage();
+                    }
                 }
+
+                if (sectionId === "dashboard-section") {
+                    if (typeof CityPulseApp.loadDashboard === "function") {
+                        CityPulseApp.loadDashboard();
+                    }
+                }
+
+            } catch (e) {
+                // Silent
             }
 
-            if (sectionId === "dashboard-section") {
-
-                if (typeof CityPulseApp.loadDashboard === "function") {
-                    CityPulseApp.loadDashboard();
-                }
-            }
-
-        } catch (e) {
-            // Silent — never break UI on live update
         }
 
         setTimeout(() => {
             setLiveIndicator("● LIVE", "live");
         }, 2500);
+
+    }
+
+    function handleEmergencyBroadcast(message) {
+
+        let envelope;
+
+        try {
+            envelope = JSON.parse(message.body);
+        } catch (e) {
+            return;
+        }
+
+        const payload = envelope.payload || envelope;
+
+        if (typeof CityPulseApp !== "undefined" &&
+            typeof CityPulseApp.handleEmergencyBroadcast === "function") {
+            CityPulseApp.handleEmergencyBroadcast(payload);
+        }
+
     }
 
     function connect() {
 
-        if (typeof SockJS === "undefined"
-                || StompClient === null) {
-
+        if (typeof SockJS === "undefined" || StompClient === null) {
             setLiveIndicator("● OFFLINE (libraries missing)", "offline");
             return;
         }
@@ -5056,75 +5235,94 @@ document.addEventListener(
             return;
         }
 
-        stompClient = StompClient.over(socket);
-
-        stompClient.debug = null;
+        stompClient = StompClient.over(function () { return socket; });
+        stompClient.debug = function () {};
 
         stompClient.connect(
             {},
             function onConnected() {
 
                 reconnectAttempts = 0;
-
                 setLiveIndicator("● LIVE", "live");
 
-                stompClient.subscribe(
-                    "/topic/traffic",
-                    handleTrafficUpdate
-                );
+                stompClient.subscribe("/topic/traffic", handleTrafficUpdate);
 
-                stompClient.subscribe(
-                    "/topic/predictions",
-                    function (message) {
+                stompClient.subscribe("/topic/predictions", function (message) {
 
-                        setLiveIndicator(
-                            "● LIVE — prediction received",
-                            "live"
-                        );
+                    setLiveIndicator("● LIVE — prediction received", "live");
 
-                        setTimeout(() => {
-                            setLiveIndicator("● LIVE", "live");
-                        }, 2500);
-                    }
-                );
+                    let payload = null;
+                    try { payload = JSON.parse(message.body); } catch (e) { }
 
-                stompClient.subscribe(
-                    "/topic/alerts",
-                    function (message) {
+                    const level = payload?.predictedTrafficLevel ||
+                        payload?.payload?.predictedTrafficLevel ||
+                        "NEW";
 
-                        setLiveIndicator(
-                            "● LIVE — alert received",
-                            "live"
-                        );
+                    notify(
+                        "◈ New Prediction",
+                        `Traffic prediction updated — ${level}`,
+                        "prediction-update"
+                    );
 
-                        setTimeout(() => {
-                            setLiveIndicator("● LIVE", "live");
-                        }, 2500);
-                    }
-                );
+                    setTimeout(() => setLiveIndicator("● LIVE", "live"), 2500);
 
-                stompClient.subscribe(
-                    "/topic/reports",
-                    function (message) {
+                });
 
-                        setLiveIndicator(
-                            "● LIVE — report received",
-                            "live"
-                        );
+                stompClient.subscribe("/topic/alerts", function (message) {
 
-                        setTimeout(() => {
-                            setLiveIndicator("● LIVE", "live");
-                        }, 2500);
-                    }
-                );
+                    setLiveIndicator("● LIVE — alert received", "live");
+
+                    let payload = null;
+                    try { payload = JSON.parse(message.body); } catch (e) { }
+
+                    const title = payload?.title ||
+                        payload?.payload?.title ||
+                        "New Traffic Alert";
+
+                    const severity = payload?.severity ||
+                        payload?.payload?.severity ||
+                        "INFO";
+
+                    notify(
+                        `🚨 ${severity} Alert`,
+                        title,
+                        "alert-update"
+                    );
+
+                    setTimeout(() => setLiveIndicator("● LIVE", "live"), 2500);
+
+                });
+
+                stompClient.subscribe("/topic/reports", function (message) {
+
+                    setLiveIndicator("● LIVE — report received", "live");
+
+                    let payload = null;
+                    try { payload = JSON.parse(message.body); } catch (e) { }
+
+                    const desc = payload?.description ||
+                        payload?.payload?.description ||
+                        "New citizen report";
+
+                    notify(
+                        "📝 New Citizen Report",
+                        desc,
+                        "report-update"
+                    );
+
+                    setTimeout(() => setLiveIndicator("● LIVE", "live"), 2500);
+
+                });
+
+                stompClient.subscribe("/topic/emergency", handleEmergencyBroadcast);
+
             },
             function onError() {
-
                 setLiveIndicator("● OFFLINE — retrying...", "offline");
-
                 attemptReconnect();
             }
         );
+
     }
 
     function attemptReconnect() {
@@ -5145,21 +5343,17 @@ document.addEventListener(
             }
 
         }, RECONNECT_DELAY_MS);
+
     }
 
     function initialize() {
 
         if (document.readyState === "loading") {
-
-            document.addEventListener(
-                "DOMContentLoaded",
-                connect
-            );
-
+            document.addEventListener("DOMContentLoaded", connect);
         } else {
-
             connect();
         }
+
     }
 
     initialize();
