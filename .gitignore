@@ -53,3 +53,6 @@ routing-engine/*.jar
 ### Local backup files (not part of the project) ###
 *.backup-*
 *.backup.*
+
+src/main/resources/application.properties
+src/main/resources/application.properties.bak

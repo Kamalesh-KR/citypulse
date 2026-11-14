@@ -1,0 +1,28 @@
+﻿# CityPulse - Application Configuration Template
+# Copy this file to application.properties and fill in your own values.
+
+# Database
+spring.datasource.url=jdbc:mysql://localhost:3306/citypulse_traffic_db
+spring.datasource.username=YOUR_DB_USERNAME
+spring.datasource.password=YOUR_DB_PASSWORD
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
+
+# Server
+server.port=8080
+
+# JWT
+citypulse.jwt.secret=YOUR_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS
+citypulse.jwt.expiration-ms=86400000
+
+# Routing (GraphHopper / OSRM)
+citypulse.routing.graphhopper-url=http://localhost:8989
+
+# Geocoding (Photon)
+citypulse.geocoding.photon-url=http://localhost:2322
+
+# Push Notifications (VAPID)
+citypulse.push.public-key=YOUR_VAPID_PUBLIC_KEY
+citypulse.push.private-key=YOUR_VAPID_PRIVATE_KEY
+citypulse.push.subject=mailto:you@example.com
